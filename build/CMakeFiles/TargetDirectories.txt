@@ -1,0 +1,3 @@
+/home/denis/Scrivania/prog/myEmulator/build/CMakeFiles/main.dir
+/home/denis/Scrivania/prog/myEmulator/build/CMakeFiles/edit_cache.dir
+/home/denis/Scrivania/prog/myEmulator/build/CMakeFiles/rebuild_cache.dir

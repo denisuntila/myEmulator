@@ -130,6 +130,7 @@ CMakeFiles/main.dir/src/cartridge.c.o: /home/denis/Scrivania/prog/myEmulator/src
 
 CMakeFiles/main.dir/src/cpu.c.o: /home/denis/Scrivania/prog/myEmulator/src/cpu.c \
   /home/denis/Scrivania/prog/myEmulator/include/cpu.h \
+  /home/denis/Scrivania/prog/myEmulator/include/instructions.h \
   /usr/include/bits/floatn-common.h \
   /usr/include/bits/floatn.h \
   /usr/include/bits/libc-header-start.h \
@@ -411,6 +412,7 @@ CMakeFiles/main.dir/src/emulator.c.o: /home/denis/Scrivania/prog/myEmulator/src/
   /usr/lib/gcc/x86_64-pc-linux-gnu/14.2.1/include/xtestintrin.h
 
 CMakeFiles/main.dir/src/instructions.c.o: /home/denis/Scrivania/prog/myEmulator/src/instructions.c \
+  /home/denis/Scrivania/prog/myEmulator/include/cpu.h \
   /home/denis/Scrivania/prog/myEmulator/include/instructions.h \
   /usr/include/bits/floatn-common.h \
   /usr/include/bits/floatn.h \
@@ -442,6 +444,7 @@ CMakeFiles/main.dir/src/instructions.c.o: /home/denis/Scrivania/prog/myEmulator/
   /usr/include/stdio.h \
   /usr/include/sys/cdefs.h \
   /usr/lib/gcc/x86_64-pc-linux-gnu/14.2.1/include/stdarg.h \
+  /usr/lib/gcc/x86_64-pc-linux-gnu/14.2.1/include/stdbool.h \
   /usr/lib/gcc/x86_64-pc-linux-gnu/14.2.1/include/stddef.h \
   /usr/lib/gcc/x86_64-pc-linux-gnu/14.2.1/include/stdint.h
 

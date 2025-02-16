@@ -38,12 +38,12 @@ int emu_run(int argc, char **argv)
   ctx.paused = false;
   ctx.ticks = 0;
 
-  load_cartridge("../roms/sma.gba");
+  load_cartridge("../roms/arm.gba");
 
-  uint32_t instruction = 0x0f000000;
+  uint32_t instruction = 0x0A000090;
 
-  void (*function)(uint32_t) = decode_instruction(instruction);
-  function(instruction);
+  void (*function)(cpu_context *) = decode_instruction(instruction);
+  //function(instruction);
   while (ctx.running)
   {
     if (ctx.paused)

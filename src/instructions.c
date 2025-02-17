@@ -24,6 +24,15 @@ static const uint32_t instruction_type_format_masks[][2] =
 };
 
 
+static const char *conds[] =
+{
+  "eq", "ne", "hs", "lo",
+  "mi", "pl", "vs", "vc",
+  "hi", "ls", "ge", "lt",
+  "gt", "le", "", ""
+};
+
+
 void arm_branch_and_exchange      (cpu_context *cpu);
 void arm_block_data_transfer      (cpu_context *cpu);
 void arm_branch_branch_link       (cpu_context *cpu);
@@ -60,7 +69,7 @@ static void (*functions[])(cpu_context *) =
 
 void arm_no_impl(cpu_context *cpu)
 {
-  printf("Instruction 0x%08x is not implemnted!\n", cpu->current_instruction);
+  printf("Instruction 0x%x is not implemnted!\n", cpu->current_instruction);
 }
 
 
@@ -87,14 +96,37 @@ void arm_branch_and_exchange(cpu_context *cpu)
 
 void arm_block_data_transfer(cpu_context *cpu)
 {
-  printf("Block data transfer\n");
+  uint8_t cond = (cpu->current_instruction >> 28) & 0xF;
+  uint8_t pu = (cpu->current_instruction >> 23) & 0x3;
+  uint8_t s_flag = (cpu->current_instruction >> 22) & 0x1;
+  uint8_t writeback = (cpu->current_instruction >> 21) & 0x1;
+  uint8_t load = (cpu->current_instruction >> 20) & 0x1;
+  uint8_t Rn = (cpu->current_instruction >> 16) & 0xF;
+
+  const char *amod[] =
+  {
+    "ib", "ia", "db", "da"
+  };
+
+  printf(load ? "ldm" : "stm");
+  printf("%s%s\tr%d%c, {", amod[pu], conds[cond], Rn, writeback ? '!' : '\0');
+  bool comma = false;
+  for (uint8_t i = 0; i < 0x10; ++i)
+  {
+    if ((cpu->current_instruction >> i) & 0x1)
+    {
+      printf("%sr%d", comma ? ", " : "", i);
+      comma = comma | true;
+    }
+  }
+  printf("}\n");
 }
 
 void arm_branch_branch_link(cpu_context *cpu)
 {
   uint8_t L = (cpu->current_instruction >> 24) & 1;
   uint32_t offset = (cpu->current_instruction & 0xFFFFFF) << 2;
-  printf("%s \t#%d\n", (L ? "bl" : "b"), offset);
+  printf("%s \t#0x%x\n", (L ? "bl" : "b"), (offset + 8 + cpu->regs[15]) & 0xFFFFFF);
 }
 
 void arm_software_interrupt(cpu_context *cpu)
@@ -181,39 +213,81 @@ void arm_multiply_long(cpu_context *cpu)
 
 void arm_halfword_transfer(cpu_context *cpu)
 {
+  uint8_t cond = (cpu->current_instruction >> 28) & 0xF;
   uint8_t pre_indexed = (cpu->current_instruction >> 24) & 1;
   uint8_t up = (cpu->current_instruction >> 23) & 1;
   uint8_t writeback = (cpu->current_instruction >> 21) & 1;
   uint8_t load = (cpu->current_instruction >> 20) & 1;
-  uint8_t is_signed = (cpu->current_instruction >> 6) & 0xF;
+  uint8_t sh = (cpu->current_instruction >> 5) & 0x3;
 
   uint8_t Rn = (cpu->current_instruction >> 16) & 0xF;
   uint8_t Rd = (cpu->current_instruction >> 12) & 0xF;
   uint8_t Rm = cpu->current_instruction & 0xF;
 
-  printf("%s%ch\tr%d, [r%d, %cr%d]%c\n", load ? "ldr" : "str", 
-    is_signed ? 's' : '\0', Rd, Rn, up ? '\0' : '-', Rm,
-    writeback ? '!' : '\0');
+  const char *l_types[] =
+  {
+    "RESERVED",
+    "ldrh",
+    "ldrsb",
+    "ldrsh"
+  };
+
+  const char *s_types[] =
+  {
+    "RESERVED",
+    "strh",
+    "ldrd",
+    "strd"
+  };
+
+  printf("%s%s\tr%d, [r%d",
+    (load ? l_types : s_types)[sh], conds[cond],
+    Rd, Rn);
+  printf(pre_indexed ? ", %c#%d]%c\n" : "], %c#%d%c\n",
+    up ? '\0' : '-', Rm, writeback ? '!' : '\0');
+  //printf("%s%ch\tr%d, [r%d, %cr%d]%c\n", load ? "ldr" : "str", 
+  //  is_signed ? 's' : '\0', Rd, Rn, up ? '\0' : '-', Rm,
+  //  writeback ? '!' : '\0');
 
 }
 
 void arm_halfword_transfer_imm(cpu_context *cpu)
 {
+  uint8_t cond = (cpu->current_instruction >> 28) & 0xF;
   uint8_t pre_indexed = (cpu->current_instruction >> 24) & 1;
   uint8_t up = (cpu->current_instruction >> 23) & 1;
   uint8_t writeback = (cpu->current_instruction >> 21) & 1;
   uint8_t load = (cpu->current_instruction >> 20) & 1;
-  uint8_t is_signed = (cpu->current_instruction >> 6) & 0xF;
+  uint8_t sh = (cpu->current_instruction >> 5) & 0x3;
 
   uint8_t Rn = (cpu->current_instruction >> 16) & 0xF;
   uint8_t Rd = (cpu->current_instruction >> 12) & 0xF;
   
   uint8_t offset = ((cpu->current_instruction >> 4) & 0xF0) +
     (cpu->current_instruction & 0xF);
+
+  const char *l_types[] =
+  {
+    "RESERVED",
+    "ldrh",
+    "ldrsb",
+    "ldrsh"
+  };
+
+  const char *s_types[] =
+  {
+    "RESERVED",
+    "strh",
+    "ldrd",
+    "strd"
+  };
   
-  printf("%s%ch\tr%d, [r%d, #%c%d]%c\n", load ? "ldr" : "str", 
-    is_signed ? 's' : '\0', Rd, Rn, up ? '\0' : '-', offset,
-    writeback ? '!' : '\0');
+  printf("%s%s\tr%d, [r%d",
+    (load ? l_types : s_types)[sh], conds[cond],
+    Rd, Rn);
+
+  printf(pre_indexed ? ", %c#%d]%c\n" : "], %c#%d%c\n",
+    up ? '\0' : '-', offset, writeback ? '!' : '\0');
   
 }
 
@@ -236,6 +310,7 @@ void arm_msr(cpu_context *cpu)
 
 void arm_data_processing(cpu_context *cpu)
 {
+  uint8_t cond = (cpu->current_instruction >> 28) & 0xF;
   uint8_t immediate = (cpu->current_instruction >> 25) & 0x1;
   uint8_t opcode = (cpu->current_instruction >> 21) & 0xF;
   uint8_t set_condition_codes = (cpu->current_instruction >> 20) & 0x1;
@@ -257,17 +332,17 @@ void arm_data_processing(cpu_context *cpu)
   uint8_t Rn = (cpu->current_instruction >> 16) & 0xF;
   uint8_t Rd = (cpu->current_instruction >> 12) & 0xF;
 
-  printf("%s\t", ops[opcode]);
+  printf("%s%s\t", ops[opcode], conds[cond]);
   (opcode & 0xC) == 0x8 ? printf("") : printf("r%d, ", Rd); 
   (opcode & 0xD) == 0xD ? printf("") : printf("r%d, ", Rn);
 
   if (immediate)
   {
-    uint8_t nn = (cpu->current_instruction) & 0xF;
-    uint8_t Is = (cpu->current_instruction >> 7) & 0x1E;
+    uint8_t nn = (cpu->current_instruction) & 0xFF;
+    uint8_t Is = (cpu->current_instruction >> 7) & 0x1E;  //multiplied by 2
     // ror shift
     uint32_t value = (nn >> Is) | (nn << (32 - Is));
-    printf("#0x%08x\n", value);
+    printf("#0x%x\n", value);
   }
   else
   {

@@ -76,3 +76,14 @@ void cartridge_write_byte(uint16_t address, uint8_t value)
   // Not implemented
 }
 
+uint32_t cartridge_read_word(uint16_t address)
+{
+  return *((uint32_t *)&cart.rom_data[address]);
+}
+
+uint16_t cartridge_read_halfword(uint16_t address)
+{
+  return *((uint16_t *)&cart.rom_data[address]);
+}
+
+

@@ -63,3 +63,22 @@ void bus_write(uint32_t address, uint8_t value)
   
   NO_IMPL
 }
+
+
+uint16_t bus_read_halfword(uint32_t address)
+{
+  // Read on the ROM
+  if (address >= 0x08000000 && address <= 0x0DFFFFFF)
+  {
+    return cartridge_read_halfword((uint16_t)address);
+  }
+}
+
+uint32_t bus_read_word(uint32_t address)
+{
+  // Read on the ROM
+  if (address >= 0x08000000 && address <= 0x0DFFFFFF)
+  {
+    return cartridge_read_word((uint16_t)address);
+  }
+}

@@ -25,4 +25,8 @@ bool load_cartridge(char *file_name);
 uint8_t cartridge_read_byte(uint16_t address);
 void cartridge_write_byte(uint16_t address, uint8_t value);
 
+uint32_t cartridge_read_word(uint16_t address);
+
+uint16_t cartridge_read_halfword(uint16_t address);
+
 #endif

@@ -9,6 +9,7 @@
 #include "cpu.h"
 
 #include "instructions.h"
+#include "bus.h"
 
 
 
@@ -39,11 +40,8 @@ int emu_run(int argc, char **argv)
   ctx.ticks = 0;
 
   load_cartridge("../roms/arm.gba");
-
-  uint32_t instruction = 0x0A000090;
-
-  void (*function)(cpu_context *) = decode_instruction(instruction);
-  //function(instruction);
+  printf("Dati letti: 0x%08x\n",
+    bus_read_word(0x08000000));
   while (ctx.running)
   {
     if (ctx.paused)

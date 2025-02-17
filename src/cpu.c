@@ -4,13 +4,15 @@
 #include "cpu.h"
 #include "instructions.h"
 
+#include "bus.h"
+
 
 cpu_context cpu;
 
 void cpu_init()
 {
   printf("CPU Initialization\n");
-  cpu.current_instruction = 0xE12FFF16;
+  cpu.current_instruction = 0xea00002e;
 }
 
 bool cpu_step()
@@ -20,51 +22,14 @@ bool cpu_step()
 
   function(&cpu);
 
-  cpu.current_instruction = 0x0B0000EB;
-
-  function = decode_instruction(cpu.current_instruction);
-
-  function(&cpu);
-
-
-  
-  cpu.current_instruction = 0xE7312183;
-
-  function = decode_instruction(cpu.current_instruction);
-
-  function(&cpu);
-
-
-  
-  cpu.current_instruction = 0xE1020093;
-
-  function = decode_instruction(cpu.current_instruction);
-
-  function(&cpu);
-
-
-  //cpu.current_instruction = 0xE0203291;
-  cpu.current_instruction = 0xE0100291;
-
-  function = decode_instruction(cpu.current_instruction);
-
-  function(&cpu);
-
-  
-  cpu.current_instruction = 0xE0910392;
-
-  function = decode_instruction(cpu.current_instruction);
-
-  function(&cpu);
-
   
 
-  cpu.current_instruction = 0xE1BFF0FF;
-
-  function = decode_instruction(cpu.current_instruction);
-
-  function(&cpu);
-
+  for (uint32_t i = 0x080000C0; i < 0x08000140; i += 4)
+  {
+    cpu.current_instruction = bus_read_word(i);
+    function = decode_instruction(cpu.current_instruction);
+    function(&cpu);
+  }
 
 
   return false;

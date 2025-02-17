@@ -7,4 +7,7 @@
 uint8_t bus_read(uint32_t address);
 void bus_write(uint32_t address, uint8_t value);
 
+uint16_t bus_read_halfword(uint32_t address);
+uint32_t bus_read_word(uint32_t address);
+
 #endif

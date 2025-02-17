@@ -117,7 +117,7 @@ void arm_single_data_transfer(cpu_context *cpu)
   uint8_t up = (cpu->current_instruction >> 23) & 1;
   uint8_t byte = (cpu->current_instruction >> 22) & 1;
   uint8_t writeback = (cpu->current_instruction >> 21) & 1;
-  uint8_t load = (cpu->current_instruction >> 24) & 1;
+  uint8_t load = (cpu->current_instruction >> 20) & 1;
   printf("%s%c\t", load ? "ldr" : "str", byte ? 'b' : '\0');
   printf("r%d, [r%d", Rd, Rn);
   char wb = writeback ? '!' : '\0';
@@ -181,26 +181,118 @@ void arm_multiply_long(cpu_context *cpu)
 
 void arm_halfword_transfer(cpu_context *cpu)
 {
-  printf("Halfword data transfer\n");
+  uint8_t pre_indexed = (cpu->current_instruction >> 24) & 1;
+  uint8_t up = (cpu->current_instruction >> 23) & 1;
+  uint8_t writeback = (cpu->current_instruction >> 21) & 1;
+  uint8_t load = (cpu->current_instruction >> 20) & 1;
+  uint8_t is_signed = (cpu->current_instruction >> 6) & 0xF;
+
+  uint8_t Rn = (cpu->current_instruction >> 16) & 0xF;
+  uint8_t Rd = (cpu->current_instruction >> 12) & 0xF;
+  uint8_t Rm = cpu->current_instruction & 0xF;
+
+  printf("%s%ch\tr%d, [r%d, %cr%d]%c\n", load ? "ldr" : "str", 
+    is_signed ? 's' : '\0', Rd, Rn, up ? '\0' : '-', Rm,
+    writeback ? '!' : '\0');
+
 }
 
 void arm_halfword_transfer_imm(cpu_context *cpu)
 {
-  printf("Halfword data transfer immediate\n");
+  uint8_t pre_indexed = (cpu->current_instruction >> 24) & 1;
+  uint8_t up = (cpu->current_instruction >> 23) & 1;
+  uint8_t writeback = (cpu->current_instruction >> 21) & 1;
+  uint8_t load = (cpu->current_instruction >> 20) & 1;
+  uint8_t is_signed = (cpu->current_instruction >> 6) & 0xF;
+
+  uint8_t Rn = (cpu->current_instruction >> 16) & 0xF;
+  uint8_t Rd = (cpu->current_instruction >> 12) & 0xF;
+  
+  uint8_t offset = ((cpu->current_instruction >> 4) & 0xF0) +
+    (cpu->current_instruction & 0xF);
+  
+  printf("%s%ch\tr%d, [r%d, #%c%d]%c\n", load ? "ldr" : "str", 
+    is_signed ? 's' : '\0', Rd, Rn, up ? '\0' : '-', offset,
+    writeback ? '!' : '\0');
+  
 }
 
 void arm_mrs(cpu_context *cpu)
 {
-  printf("MRS\n");
+  uint8_t pos = (cpu->current_instruction >> 22) & 0x1;
+  uint8_t Rd = (cpu->current_instruction >> 12) & 0xF;
+  printf("mrs\tr%d, %cpsr\n", Rd, pos ? 's' : 'c');
 }
 
 void arm_msr(cpu_context *cpu)
 {
-  printf("MSR\n");
+  uint8_t immediate = (cpu->current_instruction >> 25) & 0x1;
+  uint8_t pos = (cpu->current_instruction >> 22) & 0x1;
+  uint16_t value = cpu->current_instruction & 0xFF0;
+  uint8_t Rm = cpu->current_instruction & 0xF;
+  printf("msr\t%cpsr, ", pos ? 's' : 'c');
+  immediate ? printf("#0%d\n", value + Rm) : printf("r%d\n", Rm);
 }
 
 void arm_data_processing(cpu_context *cpu)
 {
-  printf("Data processing\n");
+  uint8_t immediate = (cpu->current_instruction >> 25) & 0x1;
+  uint8_t opcode = (cpu->current_instruction >> 21) & 0xF;
+  uint8_t set_condition_codes = (cpu->current_instruction >> 20) & 0x1;
+
+  const char *ops[] =
+  {
+    "and", "eor", "sub", "rsb",
+    "add", "adc", "sbc", "rsc",
+    "tst", "teq", "cmp", "cmn",
+    "orr", "mov", "bic", "mvn"
+  };
+
+  const char *shift_types[] =
+  {
+    "lsl", "lsr",
+    "asr", "ror"
+  };
+
+  uint8_t Rn = (cpu->current_instruction >> 16) & 0xF;
+  uint8_t Rd = (cpu->current_instruction >> 12) & 0xF;
+
+  printf("%s\t", ops[opcode]);
+  (opcode & 0xC) == 0x8 ? printf("") : printf("r%d, ", Rd); 
+  (opcode & 0xD) == 0xD ? printf("") : printf("r%d, ", Rn);
+
+  if (immediate)
+  {
+    uint8_t nn = (cpu->current_instruction) & 0xF;
+    uint8_t Is = (cpu->current_instruction >> 7) & 0x1E;
+    // ror shift
+    uint32_t value = (nn >> Is) | (nn << (32 - Is));
+    printf("#0x%08x\n", value);
+  }
+  else
+  {
+    uint8_t shift_by_register = (cpu->current_instruction >> 4) & 0x1;
+    uint8_t Rm = cpu->current_instruction & 0xF;
+
+    printf("r%d, %s ", Rm, shift_types[(cpu->current_instruction >> 5) & 0x3]);
+
+    if (shift_by_register)
+    {
+      uint8_t Rs = (cpu->current_instruction >> 8) & 0xF;
+      printf("r%d\n", Rs);
+    }
+    else
+    {
+      printf("#%d\n", (cpu->current_instruction >> 7) & 0x1F);
+    }
+  }
 }
+
+/*
+
+  1110 0010 1000 0001 0000 0010 0000 0111
+  E2810207
+  
+
+*/
 

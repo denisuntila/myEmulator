@@ -8,6 +8,7 @@ set(CMAKE_DEPENDS_LANGUAGES
 
 # The set of dependency files which are needed:
 set(CMAKE_DEPENDS_DEPENDENCY_FILES
+  "/home/denis/Scrivania/prog/myEmulator/src/bios.c" "CMakeFiles/main.dir/src/bios.c.o" "gcc" "CMakeFiles/main.dir/src/bios.c.o.d"
   "/home/denis/Scrivania/prog/myEmulator/src/bus.c" "CMakeFiles/main.dir/src/bus.c.o" "gcc" "CMakeFiles/main.dir/src/bus.c.o.d"
   "/home/denis/Scrivania/prog/myEmulator/src/cartridge.c" "CMakeFiles/main.dir/src/cartridge.c.o" "gcc" "CMakeFiles/main.dir/src/cartridge.c.o.d"
   "/home/denis/Scrivania/prog/myEmulator/src/cpu.c" "CMakeFiles/main.dir/src/cpu.c.o" "gcc" "CMakeFiles/main.dir/src/cpu.c.o.d"

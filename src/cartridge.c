@@ -62,28 +62,44 @@ bool load_cartridge(char *file_name)
   printf("\tChecksum    : %2.2X (%s)\n", cart.header->complement_check,
     (chk & 0xFF) ? "PASSED" : "FAILED");
 
+  printf("\n");
   return true;
 }
 
+void dealloc_cartridge()
+{
+  free(cart.rom_data);
+}
 
-uint8_t cartridge_read_byte(uint16_t address)
+
+uint8_t cartridge_read_byte(uint32_t address)
 {
   return cart.rom_data[address];
 }
 
-void cartridge_write_byte(uint16_t address, uint8_t value)
+void cartridge_write_byte(uint32_t address, uint8_t value)
 {
   // Not implemented
 }
 
-uint32_t cartridge_read_word(uint16_t address)
+uint32_t cartridge_read_word(uint32_t address)
 {
   return *((uint32_t *)&cart.rom_data[address]);
 }
 
-uint16_t cartridge_read_halfword(uint16_t address)
+void cartridge_write_word(uint32_t address, uint32_t value)
+{
+  // Not implemented
+}
+
+uint16_t cartridge_read_halfword(uint32_t address)
 {
   return *((uint16_t *)&cart.rom_data[address]);
+}
+
+void cartridge_write_halfword(uint32_t address, uint16_t value)
+{
+  // Not implemented
 }
 
 

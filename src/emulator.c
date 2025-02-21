@@ -10,6 +10,7 @@
 
 #include "instructions.h"
 #include "bus.h"
+#include "bios.h"
 
 
 
@@ -39,7 +40,13 @@ int emu_run(int argc, char **argv)
   ctx.paused = false;
   ctx.ticks = 0;
 
+  load_bios("../bios/gba_bios.bin");
   load_cartridge("../roms/arm.gba");
+
+  for (int i = 0; i < 35; ++i)
+  {
+    cpu_step();
+  }
   
   while (ctx.running)
   {
@@ -57,6 +64,8 @@ int emu_run(int argc, char **argv)
 
     ctx.ticks++;
   }
+
+  dealloc_cartridge();
 
   return 0;
 }

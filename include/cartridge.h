@@ -22,11 +22,14 @@ typedef struct
 } rom_header;
 
 bool load_cartridge(char *file_name);
-uint8_t cartridge_read_byte(uint16_t address);
-void cartridge_write_byte(uint16_t address, uint8_t value);
+void dealloc_cartridge();
+uint8_t cartridge_read_byte(uint32_t address);
+void cartridge_write_byte(uint32_t address, uint8_t value);
 
-uint32_t cartridge_read_word(uint16_t address);
+uint32_t cartridge_read_word(uint32_t address);
+void cartridge_write_word(uint32_t address, uint32_t value);
 
-uint16_t cartridge_read_halfword(uint16_t address);
+uint16_t cartridge_read_halfword(uint32_t address);
+void cartridge_write_halfword(uint32_t address, uint16_t value);
 
 #endif

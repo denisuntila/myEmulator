@@ -32,7 +32,7 @@
 //  uint32_t SPSR;
 //} register_file;
 
-typedef struct
+typedef struct cpu_context
 {
   //register_file regs;
   uint32_t regs[16];
@@ -40,7 +40,13 @@ typedef struct
   uint32_t CPSR;
   uint32_t SPSR;
 
-  uint32_t current_instruction;
+  //uint32_t current_instruction;
+  
+  uint32_t fetched_instruction;
+  uint32_t decoded_instruction;
+  uint32_t instruction_to_exec;
+
+  void (*function)(struct cpu_context *);
 } cpu_context;
 
 void cpu_init();

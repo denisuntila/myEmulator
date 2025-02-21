@@ -1,4 +1,6 @@
 file(REMOVE_RECURSE
+  "CMakeFiles/main.dir/src/bios.c.o"
+  "CMakeFiles/main.dir/src/bios.c.o.d"
   "CMakeFiles/main.dir/src/bus.c.o"
   "CMakeFiles/main.dir/src/bus.c.o.d"
   "CMakeFiles/main.dir/src/cartridge.c.o"

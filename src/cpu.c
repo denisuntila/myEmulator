@@ -10,13 +10,19 @@
 #define TEST(add)                                                                   \
 {                                                                                   \
   uint32_t address = add;                                                           \
-  cpu.current_instruction = bus_read_word(address);                                 \
-  void (*function)(cpu_context *) = decode_instruction(cpu.current_instruction);    \
-  printf("0x%08x:\t0x%08x:\t", address, cpu.current_instruction);                   \
+  cpu.instruction_to_exec = bus_read_word(address);                                \
+  printf("Instruction: 0x%08x\n", cpu.instruction_to_exec);   \
+  void (*function)(cpu_context *) = decode_instruction(cpu.instruction_to_exec);    \
+  printf("0x%08x:\t", address);                                                     \
   function(&cpu);                                                                   \
   cpu.regs[15] += 4;                                                                \
 }
 
+// defining the nop instruction as mov r0, r0
+#define NOP 0xe1a00000
+#define PC cpu.regs[15]
+#define LR cpu.regs[14]
+#define SP cpu.regs[13]
 
 static cpu_context cpu;
 
@@ -24,57 +30,43 @@ void cpu_init()
 {
   printf("CPU Initialization\n");
   // Set the program counter to 0
-  cpu.regs[15] = 0;
+  //cpu.regs[15] = 0x07FFFFFC;
+  PC = 0x08000000;
+  //PC = 0x00000000;
+  SP = 0x03007f00;
+  cpu.instruction_to_exec = NOP;
+  cpu.decoded_instruction = NOP;
+  cpu.fetched_instruction = NOP;
+  cpu.function = decode_instruction(cpu.instruction_to_exec);
 }
 
 bool cpu_step()
 {
-  //printf("CPU not implemented yet\n");
-  //uint32_t address = 0x08000000;
-  //cpu.current_instruction = bus_read_word(address);
-  //void (*function)(cpu_context *) = decode_instruction(cpu.current_instruction);
-  //printf("0x%08x:\t", address);
-  //function(&cpu);
+  printf("PC = 0x%08x\n", PC);
+  cpu.fetched_instruction = bus_read_word(PC);
+  printf("Fetched instruction: 0x%08x\n", cpu.fetched_instruction);
 
-  TEST(0x08000000);
-  TEST(0x080000C0);
-  TEST(0x08001EC8);
-  TEST(0x08001ED0);
-  TEST(0x08001ED4);
-  TEST(0x08001ED8);
-  TEST(0x08001EDC);
-  TEST(0x08001EE0);
-  TEST(0x08001EE4);
-  TEST(0x08001EE8);
-  TEST(0x08001EEC);
-  TEST(0x08001EF0);
-  TEST(0x08001EF4);
-  TEST(0x08001EF8);
-  TEST(0x08001EFC);
-  TEST(0x08001F00);
-  TEST(0x08001F04);
-  TEST(0x08001F08);
-  TEST(0x08001F0C);
-  TEST(0x08001F04);
-  TEST(0x08001F08);
-  TEST(0x08001F0C);
-  TEST(0x08001F10);
-  TEST(0x08001F14);
-  TEST(0x08001F18);
-  TEST(0x08001F1C);
-  TEST(0x08001F20);
-  TEST(0x08001F24);
-  
+  //void (*func)(cpu_context *) = decode_instruction(cpu.decoded_instruction);
+  printf("Decoded instruction = 0x%08x\n", cpu.decoded_instruction);
 
-  
+  uint32_t old_pc = PC;
+  cpu.function(&cpu);
+  printf("Executed instruction: 0x%08x\n", cpu.instruction_to_exec);
+  // If an instruction changed the pc, then flush the pipeline
+  if (old_pc != PC)
+    flush(&cpu);
 
-  //for (uint32_t i = 0x080000C0; i < 0x08000140; i += 4)
-  //{
-  //  cpu.current_instruction = bus_read_word(i);
-  //  function = decode_instruction(cpu.current_instruction);
-  //  function(&cpu);
-  //}
+  //cpu.function = func;
+  cpu.function = decode_instruction(cpu.decoded_instruction);
+  printf("Cond: %s\n", verify_condition(&cpu) ? "TRUE" : "FALSE");
+  cpu.instruction_to_exec = cpu.decoded_instruction;
+  cpu.decoded_instruction = cpu.fetched_instruction;
 
+  printf("LR = 0x%08x\n", LR);
+  printf("SP = 0x%08x\n", SP);
 
+  PC += 4;
+
+  printf("\n");
   return false;
 }

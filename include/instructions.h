@@ -6,5 +6,7 @@
 
 
 void (*decode_instruction(uint32_t instruction))(cpu_context *);
+bool verify_condition(cpu_context *cpu);
+void flush(cpu_context *cpu);
 
 #endif

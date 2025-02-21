@@ -4,6 +4,7 @@
 
 #include "bus.h"
 #include "cartridge.h"
+#include "bios.h"
 
 //General Internal Memory
 //
@@ -41,13 +42,50 @@
 #define NO_IMPL { fprintf(stderr, "NOT YET IMPLEMENTED\n"); exit(-5); }
 
 
+uint8_t on_board_wram[262144];    // 256  KB
+uint8_t on_chip_wram[32768];      // 32   kB
+
+
+uint8_t read_ob_wram_byte(uint32_t address);
+uint16_t read_ob_wram_halfword(uint32_t address);
+uint32_t read_ob_wram_word(uint32_t address);
+
+void write_ob_wram_byte(uint32_t address, uint8_t value);
+void write_ob_wram_halfword(uint32_t address, uint16_t value);
+void write_ob_wram_word(uint32_t address, uint32_t value);
+
+
+uint8_t read_oc_wram_byte(uint32_t address);
+uint16_t read_oc_wram_halfword(uint32_t address);
+uint32_t read_oc_wram_word(uint32_t address);
+
+void write_oc_wram_byte(uint32_t address, uint8_t value);
+void write_oc_wram_halfword(uint32_t address, uint16_t value);
+void write_oc_wram_word(uint32_t address, uint32_t value);
+
+
 uint8_t bus_read(uint32_t address)
 {
-  // Read on the ROM
-  if (address >= 0x08000000 && address <= 0x0DFFFFFF)
+  if (address <= 0x00003FFF)
   {
-    return cartridge_read_byte((uint16_t)address);
+    return bios_read_byte(address);
   }
+  else if (address >= 0x08000000 && address <= 0x0DFFFFFF)
+  {
+    address &= 0x07FFFFFF;
+    return cartridge_read_byte(address);
+  }
+  else if (address >= 0x02000000 && address <= 0x0203FFFF)
+  {
+    address &= 0x0003FFFF;
+    return read_ob_wram_byte(address);
+  }
+  else if (address >= 0x03000000 && address <= 0x03007FFF)
+  {
+    address &= 0x00007FFF;
+    return read_ob_wram_byte(address);
+  }
+  
 
   NO_IMPL
 }
@@ -57,7 +95,20 @@ void bus_write(uint32_t address, uint8_t value)
 {
   if (address >= 0x08000000 && address <= 0x0DFFFFFF)
   {
-    cartridge_write_byte((uint16_t)address, value);
+    address &= 0x07FFFFFF;
+    cartridge_write_byte(address, value);
+    return;
+  }
+  else if (address >= 0x02000000 && address <= 0x0203FFFF)
+  {
+    address &= 0x0003FFFF;
+    write_ob_wram_byte(address, value);
+    return;
+  }
+  else if (address >= 0x03000000 && address <= 0x03007FFF)
+  {
+    address &= 0x00007FFF;
+    write_oc_wram_byte(address,value);
     return;
   }
   
@@ -68,17 +119,171 @@ void bus_write(uint32_t address, uint8_t value)
 uint16_t bus_read_halfword(uint32_t address)
 {
   // Read on the ROM
+  if (address <= 0x00003FFF)
+  {
+    return bios_read_halfword(address);
+  }
+  else if (address >= 0x08000000 && address <= 0x0DFFFFFF)
+  {
+    address &= 0x07FFFFFF;
+    return cartridge_read_halfword(address);
+  }
+  else if (address >= 0x02000000 && address <= 0x0203FFFF)
+  {
+    address &= 0x0003FFFF;
+    return read_ob_wram_halfword(address);
+  }
+  else if (address >= 0x03000000 && address <= 0x03007FFF)
+  {
+    address &= 0x00007FFF;
+    return read_oc_wram_halfword(address);
+  }
+
+  NO_IMPL
+}
+
+
+void bus_write_halfword(uint32_t address, uint16_t value)
+{
   if (address >= 0x08000000 && address <= 0x0DFFFFFF)
   {
-    return cartridge_read_halfword((uint16_t)address);
+    address &= 0x07FFFFFF;
+    cartridge_write_halfword(address, value);
+    return;
   }
+  else if (address >= 0x02000000 && address <= 0x0203FFFF)
+  {
+    address &= 0x0003FFFF;
+    write_ob_wram_halfword(address, value);
+    return;
+  }
+  else if (address >= 0x03000000 && address <= 0x03007FFF)
+  {
+    address &= 0x00007FFF;
+    write_oc_wram_halfword(address,value);
+    return;
+  }
+  
+  
+  NO_IMPL
 }
+
 
 uint32_t bus_read_word(uint32_t address)
 {
-  // Read on the ROM
+  if (address <= 0x00003FFF)
+  {
+    return bios_read_word(address);
+  }
+  else if (address >= 0x08000000 && address <= 0x0DFFFFFF)
+  {
+    address &= 0x07FFFFFF;
+    return cartridge_read_word(address);
+  }
+  else if (address >= 0x02000000 && address <= 0x0203FFFF)
+  {
+    address &= 0x0003FFFF;
+    return read_ob_wram_word(address);
+  }
+  else if (address >= 0x03000000 && address <= 0x03007FFF)
+  {
+    address &= 0x00007FFF;
+    return read_oc_wram_word(address);
+  }
+
+  NO_IMPL
+}
+
+void bus_write_word(uint32_t address, uint32_t value)
+{
   if (address >= 0x08000000 && address <= 0x0DFFFFFF)
   {
-    return cartridge_read_word((uint16_t)address);
+    address &= 0x07FFFFFF;
+    cartridge_write_word(address, value);
+    return;
   }
+  else if (address >= 0x02000000 && address <= 0x0203FFFF)
+  {
+    address &= 0x0003FFFF;
+    write_ob_wram_word(address, value);
+    return;
+  }
+  else if (address >= 0x03000000 && address <= 0x03007FFF)
+  {
+    address &= 0x00007FFF;
+    write_oc_wram_word(address,value);
+    return;
+  }
+  
+  NO_IMPL
 }
+
+
+
+
+
+uint8_t read_ob_wram_byte(uint32_t address)
+{
+  return on_board_wram[address];
+}
+
+uint16_t read_ob_wram_halfword(uint32_t address)
+{
+  return *((uint16_t *)&on_board_wram[address]);
+}
+
+uint32_t read_ob_wram_word(uint32_t address)
+{
+  return *((uint32_t *)&on_board_wram[address]);
+}
+
+
+void write_ob_wram_byte(uint32_t address, uint8_t value)
+{
+  on_board_wram[address] = value;
+}
+
+void write_ob_wram_halfword(uint32_t address, uint16_t value)
+{
+  *((uint16_t *)&on_board_wram[address]) = value;
+}
+
+void write_ob_wram_word(uint32_t address, uint32_t value)
+{
+  *((uint32_t *)&on_board_wram[address]) = value;
+}
+
+
+
+uint8_t read_oc_wram_byte(uint32_t address)
+{
+  return on_chip_wram[address];
+}
+
+uint16_t read_oc_wram_halfword(uint32_t address)
+{
+  return *((uint16_t *)&on_chip_wram[address]);
+}
+
+uint32_t read_oc_wram_word(uint32_t address)
+{
+  return *((uint32_t *)&on_chip_wram[address]);
+}
+
+
+void write_oc_wram_byte(uint32_t address, uint8_t value)
+{
+  on_chip_wram[address] = value;
+}
+
+void write_oc_wram_halfword(uint32_t address, uint16_t value)
+{
+  *((uint16_t *)&on_chip_wram[address]) = value;
+}
+
+void write_oc_wram_word(uint32_t address, uint32_t value)
+{
+
+  *((uint32_t *)&on_chip_wram[address]) = value;
+}
+

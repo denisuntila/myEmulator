@@ -129,6 +129,30 @@ main/fast:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/main.dir/build.make CMakeFiles/main.dir/build
 .PHONY : main/fast
 
+src/bios.o: src/bios.c.o
+.PHONY : src/bios.o
+
+# target to build an object file
+src/bios.c.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/main.dir/build.make CMakeFiles/main.dir/src/bios.c.o
+.PHONY : src/bios.c.o
+
+src/bios.i: src/bios.c.i
+.PHONY : src/bios.i
+
+# target to preprocess a source file
+src/bios.c.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/main.dir/build.make CMakeFiles/main.dir/src/bios.c.i
+.PHONY : src/bios.c.i
+
+src/bios.s: src/bios.c.s
+.PHONY : src/bios.s
+
+# target to generate assembly for a file
+src/bios.c.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/main.dir/build.make CMakeFiles/main.dir/src/bios.c.s
+.PHONY : src/bios.c.s
+
 src/bus.o: src/bus.c.o
 .PHONY : src/bus.o
 
@@ -282,6 +306,9 @@ help:
 	@echo "... edit_cache"
 	@echo "... rebuild_cache"
 	@echo "... main"
+	@echo "... src/bios.o"
+	@echo "... src/bios.i"
+	@echo "... src/bios.s"
 	@echo "... src/bus.o"
 	@echo "... src/bus.i"
 	@echo "... src/bus.s"

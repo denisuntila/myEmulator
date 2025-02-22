@@ -43,7 +43,7 @@ int emu_run(int argc, char **argv)
   load_bios("../bios/gba_bios.bin");
   load_cartridge("../roms/arm.gba");
 
-  for (int i = 0; i < 35; ++i)
+  for (int i = 0; i < 200; ++i)
   {
     cpu_step();
   }

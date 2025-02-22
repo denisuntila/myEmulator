@@ -163,8 +163,16 @@ void bus_write_halfword(uint32_t address, uint16_t value)
     write_oc_wram_halfword(address,value);
     return;
   }
-  
-  
+  else if (address >= 0x04000000 && address <= 0x040003FF)
+  {
+    printf("Write 0x%04x to 0x%08x (IO registers)\n", value, address);
+    return;
+  }
+  else if (address >= 0x05000000 && address <= 0x050003FF)
+  {
+    printf("Write 0x%04x to 0x%08x (OBJ/BG vram)\n", value, address);
+    return;
+  }
   NO_IMPL
 }
 

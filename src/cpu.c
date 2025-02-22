@@ -62,6 +62,9 @@ bool cpu_step()
   cpu.instruction_to_exec = cpu.decoded_instruction;
   cpu.decoded_instruction = cpu.fetched_instruction;
 
+  printf("R0 = 0x%08x\n", cpu.regs[0]);
+  printf("R1 = 0x%08x\n", cpu.regs[1]);
+  printf("R2 = 0x%08x\n", cpu.regs[2]);
   printf("LR = 0x%08x\n", LR);
   printf("SP = 0x%08x\n", SP);
 

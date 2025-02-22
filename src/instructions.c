@@ -4,6 +4,7 @@
 #include "instructions.h"
 #include "cpu.h"
 #include "bus.h"
+#include "alu.h"
 
 
 // defining the nop instruction as mov r0, r0
@@ -32,6 +33,36 @@
 #define AMOD_IA 0x1
 #define AMOD_DB 0x2
 #define AMOD_IB 0x3
+
+
+// For hw dw signed load store instructions
+#define LTYPES_LDRH 0x1
+#define LTYPES_LDRSB 0x2
+#define LTYPES_LDRSH 0x3
+
+#define STYPES_STRH 0x1
+#define STYPES_LDRD 0x2
+#define STYPES_STRD 0x3
+
+
+
+// alu opcodes
+#define ALU_AND 0x0
+#define ALU_EOR 0x1
+#define ALU_SUB 0x2
+#define ALU_RSB 0x3
+#define ALU_ADD 0x4
+#define ALU_ADC 0x5
+#define ALU_SBC 0x6
+#define ALU_RSC 0x7
+#define ALU_TST 0x8
+#define ALU_TEQ 0x9
+#define ALU_CMP 0xA
+#define ALU_CMN 0xB
+#define ALU_ORR 0xC
+#define ALU_MOV 0xD
+#define ALU_BIC 0xE
+#define ALU_MVN 0xF
 
 
 static const uint32_t instruction_type_format_masks[][2] = 
@@ -391,6 +422,7 @@ void arm_multiply_long(cpu_context *cpu)
 
 void arm_halfword_transfer(cpu_context *cpu)
 {
+  // TO VERIFY!!!
   uint8_t cond = (cpu->instruction_to_exec >> 28) & 0xF;
   uint8_t pre_indexed = (cpu->instruction_to_exec >> 24) & 1;
   uint8_t up = (cpu->instruction_to_exec >> 23) & 1;
@@ -421,11 +453,134 @@ void arm_halfword_transfer(cpu_context *cpu)
   printf("%s%s\tr%d, [r%d",
     (load ? l_types : s_types)[sh], conds[cond],
     Rd, Rn);
-  printf(pre_indexed ? ", %c#%d]%c\n" : "], %c#%d%c\n",
+  printf(pre_indexed ? ", %cr%d]%c\n" : "], %c#%d%c\n",
     up ? '\0' : '-', Rm, writeback ? '!' : '\0');
   //printf("%s%ch\tr%d, [r%d, %cr%d]%c\n", load ? "ldr" : "str", 
   //  is_signed ? 's' : '\0', Rd, Rn, up ? '\0' : '-', Rm,
   //  writeback ? '!' : '\0');
+
+
+  // Implementation
+  uint32_t base_address = cpu->regs[Rn];
+  if (load)
+  {
+    switch (sh)
+    {
+    case LTYPES_LDRH:
+      if (pre_indexed)
+      {
+        if (up)
+          base_address += cpu->regs[Rm];
+        else
+          base_address -= cpu->regs[Rm];
+        cpu->regs[Rd] = 0x00000000 | bus_read_halfword(base_address);
+      }
+      else
+      {
+        cpu->regs[Rd] = 0x00000000 | bus_read_halfword(base_address);
+        if (up)
+          base_address += cpu->regs[Rm];
+        else
+          base_address -= cpu->regs[Rm];
+      }
+      break;
+
+    case LTYPES_LDRSB:
+      uint8_t value;
+      if (pre_indexed)
+      {
+        if (up)
+          base_address += cpu->regs[Rm];
+        else
+          base_address -= cpu->regs[Rm];
+        value =  bus_read_halfword(base_address);
+      }
+      else
+      {
+        value =  bus_read_halfword(base_address);
+        if (up)
+          base_address += cpu->regs[Rm];
+        else
+          base_address -= cpu->regs[Rm];
+      }
+      // sign extension
+      uint32_t sign_extension = (value & 0x80) ? 0xFFFFFF00 : 0x00000000;
+
+      cpu->regs[Rd] = sign_extension | value;
+      break;
+
+    case LTYPES_LDRSH:
+      uint16_t valueh;
+      if (pre_indexed)
+      {
+        if (up)
+          base_address += cpu->regs[Rm];
+        else
+          base_address -= cpu->regs[Rm];
+        valueh =  bus_read_halfword(base_address);
+      }
+      else
+      {
+        valueh =  bus_read_halfword(base_address);
+        if (up)
+          base_address += cpu->regs[Rm];
+        else
+          base_address -= cpu->regs[Rm];
+      }
+      // sign extension
+      uint32_t sign_extensionh = (valueh & 0x8000) ? 0xFFFF0000 : 0x00000000;
+
+      cpu->regs[Rd] = sign_extensionh | valueh;
+      break;
+
+    default:
+      fprintf(stderr, "Invalid load type");
+      exit(EXIT_FAILURE);
+      break;
+    }
+  }
+  else
+  {
+    switch (sh)
+    {
+    case STYPES_STRH:
+      if (pre_indexed)
+      {
+        if (up)
+          base_address += cpu->regs[Rm];
+        else
+          base_address -= cpu->regs[Rm];
+        bus_write_halfword(base_address, cpu->regs[Rd]);
+      }
+      else
+      {
+        bus_write_halfword(base_address, cpu->regs[Rd]);
+        if (up)
+          base_address += cpu->regs[Rm];
+        else
+          base_address -= cpu->regs[Rm];
+      }
+      break;
+
+    case STYPES_LDRD:
+      fprintf(stderr, "ldrd unsupported on this architecture!\n");
+      exit(EXIT_FAILURE);
+      break;
+
+    case STYPES_STRD:
+      fprintf(stderr, "strd unsupported on this architecture!\n");
+      exit(EXIT_FAILURE);
+      break;
+
+    default:
+      fprintf(stderr, "Invalid store type!\n");
+      exit(EXIT_FAILURE);
+      break;
+    }
+  }
+
+  if (writeback)
+    cpu->regs[Rn] = base_address;
 
 }
 
@@ -539,6 +694,27 @@ void arm_data_processing(cpu_context *cpu)
       printf("#%d\n", (cpu->instruction_to_exec >> 7) & 0x1F);
     }
   }
+
+  // Implementation
+  void (*function)(alu_args *) = alu_functions[opcode];
+  alu_args args;
+
+  args.cpu = cpu;
+  args.immediate = (((cpu->instruction_to_exec >> 25) & 0x1) == 1);
+  args.set_condition_codes = (((cpu->instruction_to_exec >> 20) & 0x1) == 1);
+  args.Rd = (cpu->instruction_to_exec >> 12) & 0xF;
+  args.Rn = (cpu->instruction_to_exec >> 16) & 0xF;
+
+  args.non_imm_format.shift_by_register = (((cpu->instruction_to_exec >> 4) & 0x1) == 1);
+  args.non_imm_format.rs_is = (cpu->instruction_to_exec >> 7) & 0x1F;
+  args.non_imm_format.shift_type = (cpu->instruction_to_exec >> 5) & 0x3;
+  args.non_imm_format.Rm = cpu->instruction_to_exec & 0xF;
+
+  args.imm_format.Is = (cpu->instruction_to_exec >> 7) & 0x1E;
+  args.imm_format.nn = (cpu->instruction_to_exec) & 0xFF;
+
+  function(&args);
+
 }
 
 /*

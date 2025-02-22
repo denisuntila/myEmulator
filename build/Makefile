@@ -129,6 +129,30 @@ main/fast:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/main.dir/build.make CMakeFiles/main.dir/build
 .PHONY : main/fast
 
+src/alu.o: src/alu.c.o
+.PHONY : src/alu.o
+
+# target to build an object file
+src/alu.c.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/main.dir/build.make CMakeFiles/main.dir/src/alu.c.o
+.PHONY : src/alu.c.o
+
+src/alu.i: src/alu.c.i
+.PHONY : src/alu.i
+
+# target to preprocess a source file
+src/alu.c.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/main.dir/build.make CMakeFiles/main.dir/src/alu.c.i
+.PHONY : src/alu.c.i
+
+src/alu.s: src/alu.c.s
+.PHONY : src/alu.s
+
+# target to generate assembly for a file
+src/alu.c.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/main.dir/build.make CMakeFiles/main.dir/src/alu.c.s
+.PHONY : src/alu.c.s
+
 src/bios.o: src/bios.c.o
 .PHONY : src/bios.o
 
@@ -306,6 +330,9 @@ help:
 	@echo "... edit_cache"
 	@echo "... rebuild_cache"
 	@echo "... main"
+	@echo "... src/alu.o"
+	@echo "... src/alu.i"
+	@echo "... src/alu.s"
 	@echo "... src/bios.o"
 	@echo "... src/bios.i"
 	@echo "... src/bios.s"

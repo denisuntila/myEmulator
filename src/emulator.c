@@ -43,10 +43,6 @@ int emu_run(int argc, char **argv)
   load_bios("../bios/gba_bios.bin");
   load_cartridge("../roms/arm.gba");
 
-  for (int i = 0; i < 200; ++i)
-  {
-    cpu_step();
-  }
   
   while (ctx.running)
   {
@@ -59,10 +55,16 @@ int emu_run(int argc, char **argv)
     if (!cpu_step())
     {
       printf("CPU stopped!\n");
+      cpu_print_failed_test();
       return -3;
     }
 
-    ctx.ticks++;
+
+    // 133
+    // 636
+    if (ctx.ticks++ == 548)
+      break;
+    
   }
 
   dealloc_cartridge();

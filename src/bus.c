@@ -39,7 +39,7 @@
 //  10000000-FFFFFFFF   Not used (upper 4bits of address bus unused)
 //
 
-#define NO_IMPL { fprintf(stderr, "NOT YET IMPLEMENTED\n"); exit(-5); }
+#define NO_IMPL { fprintf(stderr, "NOT YET IMPLEMENTED: BUS\n"); exit(-5); }
 
 
 uint8_t on_board_wram[262144];    // 256  KB

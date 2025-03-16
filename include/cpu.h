@@ -35,7 +35,18 @@
 typedef struct cpu_context
 {
   //register_file regs;
-  uint32_t regs[16];
+
+  //uint32_t regs_sys_usr[16];
+  //uint32_t regs_fiq[16];
+  //uint32_t regs_svc[16];
+  //uint32_t regs_abt[16];
+  //uint32_t regs_irq[16];
+  //uint32_t regs_und[16];
+
+  uint32_t regs_sys_usr[16];
+
+  uint32_t *regs[16];
+
 
   uint32_t CPSR;
   uint32_t SPSR;
@@ -46,10 +57,17 @@ typedef struct cpu_context
   uint32_t decoded_instruction;
   uint32_t instruction_to_exec;
 
+  uint16_t thumb_fetch;
+  uint16_t thumb_decode;
+  uint16_t thumb_exec;
+
   void (*function)(struct cpu_context *);
+  void (*thumb_function)(struct cpu_context *);
 } cpu_context;
 
 void cpu_init();
 bool cpu_step();
+
+void cpu_print_failed_test();
 
 #endif

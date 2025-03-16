@@ -8,8 +8,8 @@ set(CMAKE_DEPENDS_GENERATOR "Unix Makefiles")
 set(CMAKE_MAKEFILE_DEPENDS
   "CMakeCache.txt"
   "/home/denis/Scrivania/prog/myEmulator/CMakeLists.txt"
-  "CMakeFiles/3.31.5/CMakeCCompiler.cmake"
-  "CMakeFiles/3.31.5/CMakeSystem.cmake"
+  "CMakeFiles/3.31.6/CMakeCCompiler.cmake"
+  "CMakeFiles/3.31.6/CMakeSystem.cmake"
   "/usr/lib/cmake/SDL2/SDL2Config.cmake"
   "/usr/lib/cmake/SDL2/SDL2ConfigVersion.cmake"
   "/usr/lib/cmake/SDL2/SDL2Targets-none.cmake"

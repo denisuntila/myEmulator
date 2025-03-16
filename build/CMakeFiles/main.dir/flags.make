@@ -6,5 +6,5 @@ C_DEFINES =
 
 C_INCLUDES = -I/home/denis/Scrivania/prog/myEmulator/include -isystem /usr/include/SDL2
 
-C_FLAGS = 
+C_FLAGS =  -O3 -std=gnu2x
 

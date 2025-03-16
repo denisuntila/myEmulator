@@ -38,25 +38,15 @@ typedef enum
 typedef struct
 {
   cpu_context *cpu;
-  bool immediate;
   bool set_condition_codes;
   uint8_t Rd;
   uint8_t Rn;
   
-  struct
-  {
-    bool shift_by_register;
-    uint8_t rs_is;
-    alu_shift_t shift_type;
-    uint8_t Rm;
-  }non_imm_format;
+  uint32_t op2;
 
-  struct
-  {
-    uint8_t Is;
-    uint8_t nn;
-  }imm_format;
-
+  uint32_t check_carry_value;
+  uint32_t non_shifted_value;
+  bool check_carry;
 }alu_args;
 
 
@@ -101,6 +91,13 @@ static void (*alu_functions[])(alu_args *) =
 };
 
 
+static void (*thumb_alu_functions[])(alu_args *) =
+{
+  &alu_mov,
+  &alu_cmp,
+  &alu_add,
+  &alu_sub
+};
 
 
 

@@ -208,7 +208,7 @@ main: CMakeFiles/main.dir/src/bios.c.o
 main: CMakeFiles/main.dir/src/alu.c.o
 main: CMakeFiles/main.dir/build.make
 main: /usr/lib/libSDL2main.a
-main: /usr/lib/libSDL2-2.0.so.0.3200.50
+main: /usr/lib/libSDL2-2.0.so.0.3200.52
 main: CMakeFiles/main.dir/link.txt
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/home/denis/Scrivania/prog/myEmulator/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_9) "Linking C executable main"
 	$(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/main.dir/link.txt --verbose=$(VERBOSE)

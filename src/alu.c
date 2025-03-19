@@ -20,7 +20,9 @@ void alu_and(alu_args *args)
 
 void alu_eor(alu_args *args)
 {
-  uint32_t result = REGS(args->Rn) ^ args->op2;
+  uint32_t a = REGS(args->Rn);
+  uint32_t b = args->op2;
+  uint32_t result = a ^ b;
   REGS(args->Rd) = result;
 
   if (!args->set_condition_codes)
@@ -84,6 +86,7 @@ void alu_rsb(alu_args *args)
 void alu_add(alu_args *args)
 {
   uint32_t a = REGS(args->Rn);
+  //if (args->Rn == 15) a += 4;
   uint32_t b = args->op2;
   uint32_t result = a + b;
   REGS(args->Rd) = result;
@@ -194,7 +197,7 @@ void alu_rsc(alu_args *args)
 void alu_tst(alu_args *args)
 {
   uint32_t result = REGS(args->Rn) & args->op2;
-  REGS(args->Rd) = result;
+  //REGS(args->Rd) = result;
 
   // Modify cpsr flags
   args->cpu->CPSR = (args->cpu->CPSR & 0x7FFFFFFF) |
@@ -208,7 +211,7 @@ void alu_tst(alu_args *args)
 void alu_teq(alu_args *args)
 {
   uint32_t result = REGS(args->Rn) ^ args->op2;
-  REGS(args->Rd) = result;
+  //REGS(args->Rd) = result;
 
   // Modify cpsr flags
   args->cpu->CPSR = (args->cpu->CPSR & 0x7FFFFFFF) |
@@ -222,8 +225,10 @@ void alu_teq(alu_args *args)
 void alu_cmp(alu_args *args)
 {
   uint32_t a = REGS(args->Rn);
+  //if (args->Rn == 15) a += 4;
   uint32_t b = args->op2;
   uint32_t result = a - b;
+  printf("COMPUTING 0x%08x - 0x%08x\n", a, b);
   
   // Modify cpsr flags
   args->cpu->CPSR = (args->cpu->CPSR & 0x7FFFFFFF) |
@@ -243,10 +248,11 @@ void alu_cmp(alu_args *args)
 
 void alu_cmn(alu_args *args)
 {
-  uint32_t a = REGS(args->Rn);
-  uint32_t b = args->op2;
-  uint32_t result = a + b;
-  
+  int32_t a = REGS(args->Rn);
+  int32_t b = args->op2;
+  int32_t result = a + b;
+  printf("COMPUTING 0x%08x + 0x%08x\n", a, b);
+  printf("RES = 0x%08x\n", result);
   // Modify cpsr flags
   args->cpu->CPSR = (args->cpu->CPSR & 0x7FFFFFFF) |
     (result & 0x80000000);
@@ -331,3 +337,6 @@ void alu_mvn(alu_args *args)
   //  ((args->op2 == 0) << 30);
   
 }
+
+
+

@@ -161,6 +161,48 @@ void thumb_add_sub                    (cpu_context *cpu);
 void thumb_mov_shifted_regs           (cpu_context *cpu);
 
 
+void switch_mode(cpu_context *cpu, uint8_t mode)
+{
+  switch (mode)
+  {
+  case 0x00:
+    printf("Switching to OLD USER MODE\n");
+    // not implemented
+    fprintf(stderr, "OLD USER mode not yet implemented\n");
+    exit(EXIT_FAILURE);
+    break;
+  
+  case 0x11:
+    printf("Switching to FIQ MODE\n");
+    cpu->current_SPSR = &cpu->SPSR_fiq;
+    *cpu->current_SPSR = cpu->CPSR;
+    for(int i = 8; i < 15; ++i)
+    {
+      cpu->regs[i] = &cpu->regs_fiq[i - 8];
+    }
+    break;
+  
+  case 0x1F:
+    printf("Switching to SYSTEM MODE\n");
+    if(cpu->current_SPSR == NULL)
+    {
+      fprintf(stderr, "Tying to switch to SYS mode but current spsr is null!\n");
+      exit(EXIT_FAILURE);
+    }
+    cpu->CPSR = (*cpu->current_SPSR & (0xFFFFFF00)) | 0x0000001F;
+    cpu->current_SPSR = NULL;
+    for(int i = 8; i < 15; ++i)
+    {
+      cpu->regs[i] = &cpu->regs_sys_usr[i];
+    }
+    break;
+  
+  default:
+    fprintf(stderr, "Invalid mode set!\n");
+    exit(EXIT_FAILURE);
+  }
+}
+
 
 static void (*functions[])(cpu_context *) =
 {
@@ -440,7 +482,7 @@ void arm_single_data_transfer(cpu_context *cpu)
 {
   uint8_t Rn = (cpu->instruction_to_exec >> 16) & 0xF;
   uint8_t Rd = (cpu->instruction_to_exec >> 12) & 0xF;
-  uint16_t offset = cpu->instruction_to_exec & 0xFFF;
+  uint32_t offset = cpu->instruction_to_exec & 0xFFF;
   uint8_t I = (cpu->instruction_to_exec >> 25) & 1;
   uint8_t pre_indexed = (cpu->instruction_to_exec >> 24) & 1;
   uint8_t up = (cpu->instruction_to_exec >> 23) & 1;
@@ -466,6 +508,95 @@ void arm_single_data_transfer(cpu_context *cpu)
       sign, offset & 0xF, types[(offset >> 5) & 0x3], (offset >> 7) & 0x1F, wb);
   }
   //printf("Rn = R%d, Rd = R%d, Offset = #0x%03x\n", Rn, Rd, offset);
+  
+  // Implementation
+  uint32_t address = REGS(Rn);
+  //uint32_t offset;
+
+  if(!I)
+  {
+    offset = cpu->instruction_to_exec & 0x00000FFF;
+  }
+  else
+  {
+    offset = cpu->instruction_to_exec & 0xF;
+    uint8_t shift = (cpu->instruction_to_exec >> 7) & 0x1F;
+
+    switch((alu_shift_t)((cpu->instruction_to_exec >> 5) & 0x3))
+    {
+    case 0x0:
+      offset = offset << shift;
+      break;
+
+    case 0x1:
+      offset = offset >> shift;
+      break;
+    
+    case 0x2:
+      offset = (uint32_t)(((int32_t)offset) >> shift);
+      break;
+    
+    case 0x3:
+      //printf("SHIFT = 0x%08x\n", shift);
+      if(shift != 0)
+        offset = (offset >> shift) | (offset << (32 - shift));
+      else
+        offset = (offset >> 1) | ((cpu->CPSR & 0x20000000) << 2);
+
+      //printf("OFFSET = 0x%08x\n", offset);
+      break;
+    }
+  }
+  
+  uint8_t rotation_in_word = offset % 4;
+  offset -= rotation_in_word;
+  printf("OFFSET = 0x%08x\n", offset);
+  if(pre_indexed)
+  {
+    if(up)
+      address += offset;
+    else
+      address -= offset;
+  }
+  
+
+  if(byte)
+  {
+    if(load)
+      REGS(Rd) = (uint32_t)((int32_t)bus_read(address));
+    else
+      bus_write(address, (uint8_t)REGS(Rd));
+  }
+  else
+  {
+    if(load)
+    {
+      uint32_t temp = bus_read_word(address);
+      REGS(Rd) = (temp >> (rotation_in_word * 8)) |
+        (temp << (32 - (rotation_in_word * 8)));
+      
+    }  
+    else
+    {
+      uint32_t value = REGS(Rd) + ((Rd == 15) ? 4 : 0);
+      bus_write_word(address, value);
+    }
+      
+  }
+  printf("Current l/s address: 0x%08x\n", address);
+
+  if(!pre_indexed)
+  {
+    if(up)
+      address += offset;
+    else
+      address -= offset;
+  }
+
+  if((writeback || !pre_indexed) && !(load && (Rn == Rd))) REGS(Rn) = address;
+
+  //if((writeback || !pre_indexed) && !(load && (Rn == Rd))) printf("ZIO PERA\n");
+
 }
 
 void arm_single_data_swap(cpu_context *cpu)
@@ -491,6 +622,29 @@ void arm_multiply(cpu_context *cpu)
     Rd, Rm, Rs);
   
   accumulate ? printf(", r%d\n", Rn) : printf("\n");
+
+  // Implmentation
+  if(!accumulate)
+  {
+    uint32_t a = REGS(Rm);
+    uint32_t b = REGS(Rs);
+    uint32_t result = a * b;
+
+    REGS(Rd) = result;
+  }
+  else
+  {
+    int32_t a = REGS(Rm);
+    int32_t b = REGS(Rs);
+    int32_t result = a * b;
+    result += (uint32_t)REGS(Rn);
+
+    REGS(Rd) = result;
+  }
+  
+  if (set_condition_codes)
+    printf("CPSR flags not yet implemnted for this instruction\n");
+
 }
 
 void arm_multiply_long(cpu_context *cpu)
@@ -503,8 +657,100 @@ void arm_multiply_long(cpu_context *cpu)
   uint8_t Rs = (cpu->instruction_to_exec >> 8) & 0xF;
   uint8_t Rm = (cpu->instruction_to_exec) & 0xF;
   printf("%c%s%c\tr%d, r%d, r%d, r%d\n",
-    is_unsigned ? 'u' : 's', accumulate ? "mlal" : "mull", 
+    is_unsigned ? 's' : 'u', accumulate ? "mlal" : "mull", 
     set_condition_codes ? 's' : '\0', Rn, Rd, Rm, Rs);
+  
+  
+  // Implementation
+  //printf("UA flags = 0b%02b\n", (cpu->instruction_to_exec >> 21) & 0x3);
+  switch ((cpu->instruction_to_exec >> 21) & 0x3)
+  {
+  case 0x0: // umull
+    //printf("Not yet implemented!\n");
+    uint32_t a = REGS(Rm);
+    uint32_t b = REGS(Rs);
+    uint64_t result = (uint64_t)a * (uint64_t)b;
+    
+    // RdHi
+    REGS(Rd) = *(uint32_t *)((void *)&result + 4);
+    // RdLo
+    REGS(Rn) = *(uint32_t *)((void *)&result);
+
+    if(set_condition_codes)
+    {
+      cpu->CPSR = (cpu->CPSR & 0x7FFFFFFF) |
+        (result & 0x80000000);
+
+      cpu->CPSR = (cpu->CPSR & 0xBFFFFFFF) |
+        ((result == 0) << 30);
+    }
+    break;
+  
+  case 0x1: // umlal
+    //printf("Not yet implemented!\n");
+    a = REGS(Rm);
+    b = REGS(Rs);
+    result = (uint64_t)a * (uint64_t)b;
+    result += (int64_t)(((uint64_t)REGS(Rd) << 32) | ((uint64_t)REGS(Rn)));
+    
+    // RdHi
+    REGS(Rd) = *(uint32_t *)((void *)&result + 4);
+    // RdLo
+    REGS(Rn) = *(uint32_t *)((void *)&result);
+
+    
+    if(set_condition_codes)
+    {
+      cpu->CPSR = (cpu->CPSR & 0x7FFFFFFF) |
+        (result & 0x80000000);
+
+      cpu->CPSR = (cpu->CPSR & 0xBFFFFFFF) |
+        ((result == 0) << 30);
+    }
+    break;
+
+  case 0x2: // smull
+    int32_t a_s = REGS(Rm);
+    int32_t b_s = REGS(Rs);
+    int64_t result_s = (int64_t)a_s * (int64_t)b_s;
+    
+    // RdHi
+    REGS(Rd) = *(uint32_t *)((void *)&result_s + 4);
+    // RdLo
+    REGS(Rn) = *(uint32_t *)((void *)&result_s);
+
+    if(set_condition_codes)
+    {
+      cpu->CPSR = (cpu->CPSR & 0x7FFFFFFF) |
+        (result_s & 0x80000000);
+        
+      cpu->CPSR = (cpu->CPSR & 0xBFFFFFFF) |
+        ((result_s == 0) << 30);
+    }
+    break;
+
+  default:
+    a_s = REGS(Rm);
+    b_s = REGS(Rs);
+    result_s = (int64_t)a_s * (int64_t)b_s;
+    result_s += (((int64_t)REGS(Rd) << 32) | ((int64_t)REGS(Rn)));
+    
+    // RdHi
+    REGS(Rd) = *(uint32_t *)((void *)&result_s + 4);
+    // RdLo
+    REGS(Rn) = *(uint32_t *)((void *)&result_s);
+
+    if(set_condition_codes)
+    {
+      cpu->CPSR = (cpu->CPSR & 0x7FFFFFFF) |
+        (result_s & 0x80000000);
+        
+      cpu->CPSR = (cpu->CPSR & 0xBFFFFFFF) |
+        ((result_s == 0) << 30);
+    }
+    break;
+    
+  }
 
 }
 
@@ -717,7 +963,15 @@ void arm_mrs(cpu_context *cpu)
   uint8_t pos = (cpu->instruction_to_exec >> 22) & 0x1;
   uint8_t Rd = (cpu->instruction_to_exec >> 12) & 0xF;
   printf("mrs\tr%d, %cpsr\n", Rd, pos ? 's' : 'c');
+
+  // implementation
+  REGS(Rd) = pos ? *cpu->current_SPSR : cpu->CPSR;
 }
+
+#define F_MASK 0xFF000000
+#define S_MASK 0x00FF0000
+#define X_MASK 0x0000FF00
+#define C_MASK 0x000000FF
 
 void arm_msr(cpu_context *cpu)
 {
@@ -727,10 +981,17 @@ void arm_msr(cpu_context *cpu)
   uint16_t shift = (cpu->instruction_to_exec >> 7) & 0x1E;
   uint8_t Rm = cpu->instruction_to_exec & 0xF;
 
+  uint8_t f = (cpu->instruction_to_exec >> 19) & 0x1;
+  uint8_t s = (cpu->instruction_to_exec >> 18) & 0x1;
+  uint8_t x = (cpu->instruction_to_exec >> 17) & 0x1;
+  uint8_t c = (cpu->instruction_to_exec >> 16) & 0x1;
+
+
   value += Rm;
   value = (value >> shift) | (value << (32 - shift));
 
-  printf("msr\t%cpsr, ", psr ? 's' : 'c');
+  printf("msr\t%cpsr%c%c%c%c%c, ", psr ? 's' : 'c', (f | s | x | c) ? '_' : '\0',
+    f ? 'f' : '\0', s ? 's' : '\0', x ? 'x' : '\0', c ? 'c' : '\0');
   immediate ? printf("#0x%x\n", value) : printf("r%d\n", Rm);
 
 
@@ -739,12 +1000,29 @@ void arm_msr(cpu_context *cpu)
   if (0 == psr)
     psr_ptr = &cpu->CPSR;
   else
-    NO_IMPL;
+  {
+    psr_ptr = cpu->current_SPSR;
+    if (psr_ptr == NULL)
+    {
+      fprintf(stderr, "SPSR pointer to null!\n");
+      exit(EXIT_FAILURE);
+    }
+  }   
+  //uint32_t mask = 0x00000000;
+  uint32_t mask = 0x00000000;
+  if(f) mask |= F_MASK;
+  if(c) mask |= C_MASK;
 
+  uint8_t old_mode = *psr_ptr & 0x1F;
   if (immediate)
-    *psr_ptr = value;
+    *psr_ptr = (*psr_ptr & (~mask)) | (value & mask);
   else
-    *psr_ptr = REGS(Rm);  
+    *psr_ptr = (*psr_ptr & (~mask)) | (REGS(Rm) & mask);
+  
+  uint8_t new_mode = *psr_ptr & 0x1F;
+
+  if ((old_mode != new_mode))
+    switch_mode(cpu, new_mode);
 }
 
 void arm_data_processing(cpu_context *cpu)
@@ -807,7 +1085,7 @@ void arm_data_processing(cpu_context *cpu)
   const bool is_logical[] =
   {
     true, true,
-    false, false, false, false, false,
+    false, false, false, false, false, false,
     true, true,
     false, false,
     true, true, true, true
@@ -819,6 +1097,7 @@ void arm_data_processing(cpu_context *cpu)
   uint32_t op2;
   alu_args args;
   args.check_carry = false;
+  //printf("%s\n", is_logical[opcode] ? "LOGICAL" : "ARITHMETIC");
 
   if (((cpu->instruction_to_exec >> 25) & 0x1) == 1)
   {
@@ -841,7 +1120,15 @@ void arm_data_processing(cpu_context *cpu)
     {
       shift = (cpu->instruction_to_exec >> 7) & 0x1F;
     }
-    uint32_t val = REGS(cpu->instruction_to_exec & 0xF);
+    uint8_t Rm = cpu->instruction_to_exec & 0xF;
+    uint32_t val = REGS(Rm);
+
+    //if (Rm == 15) printf("HEREE\n");
+    // only 2 reads can be done simultaneously!
+    if ((Rm == 15) && shift_by_register) val += 4;
+    if ((((cpu->instruction_to_exec >> 16) & 0xF) == 15) && shift_by_register) val += 4;
+    
+    //if ((Rm == 15) && opcode == ALU_ADD) val += 4;
     switch ((alu_shift_t)((cpu->instruction_to_exec >> 5) & 0x3))
     {
     case LSL:   // optimize this please!!
@@ -849,14 +1136,14 @@ void arm_data_processing(cpu_context *cpu)
       {
         op2 = val << shift;
 
-        if ((cpu->instruction_to_exec >> 20) & 0x1)
+        if (((cpu->instruction_to_exec >> 20) & 0x1) && (shift != 0) && is_logical[opcode])
           cpu->CPSR = (cpu->CPSR & 0xDFFFFFFF) |
             ((val << (shift - 1)) >> 2);
       }
       else
       {
         op2 = 0;
-        if ((cpu->instruction_to_exec >> 20) & 0x1)
+        if (((cpu->instruction_to_exec >> 20) & 0x1) && is_logical[opcode])
           cpu->CPSR = (cpu->CPSR & 0xDFFFFFFF) |
             (((val & 0x1) && (shift == 32)) << 29);
       }     
@@ -866,20 +1153,20 @@ void arm_data_processing(cpu_context *cpu)
       if ((shift == 0) && (!shift_by_register))
       {
         op2 = 0;
-        if ((cpu->instruction_to_exec >> 20) & 0x1)
+        if ((cpu->instruction_to_exec >> 20) & 0x1 & is_logical[opcode])
           cpu->CPSR = (cpu->CPSR & 0xDFFFFFFF) |
             ((val & 0x80000000) >> 2);
       }
       else if (shift >= 32)
       {
         op2 = 0;
-        if ((cpu->instruction_to_exec >> 20) & 0x1)
+        if ((cpu->instruction_to_exec >> 20) & 0x1 & is_logical[opcode])
           cpu->CPSR = (cpu->CPSR & 0xDFFFFFFF);
       }
       else
       {
         op2 = val >> shift; 
-        if ((cpu->instruction_to_exec >> 20) & 0x1)
+        if ((cpu->instruction_to_exec >> 20) & 0x1 & is_logical[opcode])
           cpu->CPSR = (cpu->CPSR & 0xDFFFFFFF) |
             ((val >> (shift - 1)) << 29); 
       }
@@ -889,14 +1176,14 @@ void arm_data_processing(cpu_context *cpu)
       if ((shift == 0) && (!shift_by_register))
       {
         op2 = (val & 0x80000000) ? 0xFFFFFFFF : 0x0;
-        if ((cpu->instruction_to_exec >> 20) & 0x1)
+        if ((cpu->instruction_to_exec >> 20) & 0x1 & is_logical[opcode])
           cpu->CPSR = (cpu->CPSR & 0xDFFFFFFF) |
             ((val & 0x80000000) >> 2);
       }
       else
       {
         op2 = (int32_t)(val) >> shift; 
-        if ((cpu->instruction_to_exec >> 20) & 0x1)
+        if ((cpu->instruction_to_exec >> 20) & 0x1 & is_logical[opcode])
           cpu->CPSR = (cpu->CPSR & 0xDFFFFFFF) |
             (((int32_t)(val) >> (shift - 1)) << 29); 
       }
@@ -906,23 +1193,31 @@ void arm_data_processing(cpu_context *cpu)
       if ((shift == 0) && (!shift_by_register))
       {
         op2 = (val >> 1) | ((cpu->CPSR << 2) & 0x80000000);
-        if ((cpu->instruction_to_exec >> 20) & 0x1)
+        if ((cpu->instruction_to_exec >> 20) & 0x1 & is_logical[opcode])
+          cpu->CPSR = (cpu->CPSR & 0xDFFFFFFF) |
+            ((val & 0x1) << 29);
+      }
+      else if ((shift == 0) && (shift_by_register))
+      {
+        op2 = val;
+        if ((cpu->instruction_to_exec >> 20) & 0x1 & is_logical[opcode])
           cpu->CPSR = (cpu->CPSR & 0xDFFFFFFF) |
             ((val & 0x1) << 29);
       }
       else if (shift == 32)
       {
         op2 = val;
-        if ((cpu->instruction_to_exec >> 20) & 0x1)
+        if ((cpu->instruction_to_exec >> 20) & 0x1 & is_logical[opcode])
           cpu->CPSR = (cpu->CPSR & 0xDFFFFFFF) |
             ((val & 0x80000000) >> 2);
       }
       else
       {
         op2 = (val >> shift) | (val << (32 - shift));
-        if ((cpu->instruction_to_exec >> 20) & 0x1)
+        if ((cpu->instruction_to_exec >> 20) & 0x1 & is_logical[opcode])
           cpu->CPSR = (cpu->CPSR & 0xDFFFFFFF) |
-            ((val & 0x1) << 29);
+            //((val & 0x1) << 29);
+            ((op2 & 0x80000000) >> 2);
       }
       break;
 
@@ -939,7 +1234,8 @@ void arm_data_processing(cpu_context *cpu)
   //printf("FLAG S = %s\n", args.set_condition_codes ? "TRUE" : "FALSE");
   function(&args);
   //printf("nzcv = 0x%04b\n", cpu->CPSR >> 28);
-  if (args.Rd == 15)
+  // if Rd = 15 and is not a tst/teq/cmp/cmn
+  if ((args.Rd == 15) && (!((opcode & 0xC) == 0x8)))
     flush(cpu);
 }
 

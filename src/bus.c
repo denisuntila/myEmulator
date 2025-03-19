@@ -83,7 +83,12 @@ uint8_t bus_read(uint32_t address)
   else if (address >= 0x03000000 && address <= 0x03007FFF)
   {
     address &= 0x00007FFF;
-    return read_ob_wram_byte(address);
+    return read_oc_wram_byte(address);
+  }
+  else
+  {
+    printf("Unused address\n");
+    return 0;
   }
   
 
@@ -197,6 +202,11 @@ uint32_t bus_read_word(uint32_t address)
   {
     address &= 0x00007FFF;
     return read_oc_wram_word(address);
+  }
+  else
+  {
+    printf("Unused address\n");
+    return 0;
   }
 
   NO_IMPL

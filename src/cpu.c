@@ -39,6 +39,9 @@ void cpu_init()
   // Set the program counter to 0
   //cpu.regs[15] = 0x07FFFFFC;
   //cpu.regs = cpu.regs_sys_usr;
+  cpu.current_mode = 0x1F;
+  cpu.CPSR = 0x0000001F;    
+  cpu.current_SPSR = NULL;
   for (int i = 0; i < 16; ++i)
     cpu.regs[i] = &cpu.regs_sys_usr[i];
 
@@ -73,7 +76,7 @@ bool cpu_step()
 
 void cpu_print_failed_test()
 {
-  printf("Failed test = %d\n", cpu.regs[12]);
+  printf("Failed test = %d\n", *cpu.regs[12]);
 }
 
 
@@ -124,6 +127,11 @@ bool cpu_arm_step_old()
 
 bool cpu_arm_step()
 {
+  printf("CPSR = 0x%08x\n", cpu.CPSR);
+  //if(cpu.current_SPSR != NULL)
+  //  printf("SPSR = 0x%08x\n", *cpu.current_SPSR);
+  //else
+  //  printf("No SPSR in current mode!\n");
   cpu.fetched_instruction = bus_read_word(PC);
   printf("Fetched instruction: 0x%08x\n", cpu.fetched_instruction);
   printf("Executing instruction: 0x%08x\n", cpu.instruction_to_exec);
@@ -144,6 +152,8 @@ bool cpu_arm_step()
   printf("R0 = 0x%08x\n", REGS(0));
   printf("R1 = 0x%08x\n", REGS(1));
   printf("R2 = 0x%08x\n", REGS(2));
+  printf("R3 = 0x%08x\n", REGS(3));
+  printf("R8 = 0x%08x\n", REGS(8));
   printf("LR = 0x%08x\n", LR);
   printf("SP = 0x%08x\n", SP);
   printf("nzcv = 0b%04b\n", cpu.CPSR >> 28);

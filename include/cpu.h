@@ -34,6 +34,7 @@
 
 typedef struct cpu_context
 {
+  uint8_t current_mode;
   //register_file regs;
 
   //uint32_t regs_sys_usr[16];
@@ -44,12 +45,22 @@ typedef struct cpu_context
   //uint32_t regs_und[16];
 
   uint32_t regs_sys_usr[16];
+  uint32_t regs_fiq[7];
+  uint32_t regs_svc[2];
+  uint32_t regs_abt[2];
+  uint32_t regs_irq[2];
+  uint32_t regs_und[2];
 
   uint32_t *regs[16];
 
 
   uint32_t CPSR;
-  uint32_t SPSR;
+  uint32_t *current_SPSR;
+  uint32_t SPSR_fiq;
+  uint32_t SPSR_svc;
+  uint32_t SPSR_abt;
+  uint32_t SPSR_irq;
+  uint32_t SPSR_und;
 
   //uint32_t current_instruction;
   

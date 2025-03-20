@@ -165,7 +165,7 @@ void bus_write_halfword(uint32_t address, uint16_t value)
   else if (address >= 0x03000000 && address <= 0x03007FFF)
   {
     address &= 0x00007FFF;
-    write_oc_wram_halfword(address,value);
+    write_oc_wram_halfword(address, value);
     return;
   }
   else if (address >= 0x04000000 && address <= 0x040003FF)

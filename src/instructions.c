@@ -391,7 +391,7 @@ void arm_block_data_transfer(cpu_context *cpu)
         if (load)
           REGS(i) = bus_read_word(base_address);
         else
-          bus_write_word(base_address, REGS(i));
+          bus_write_word(base_address, REGS(i) + ((i == 15) ? 0x4 : 0x0));
         //printf("%d\t(0x%08x) -> 0x%08x\n", i, REGS(i), base_address);
         base_address -= 4;
       }
@@ -406,7 +406,8 @@ void arm_block_data_transfer(cpu_context *cpu)
         if (load)
           REGS(i) = bus_read_word(base_address);
         else
-          bus_write_word(base_address, REGS(i));
+          //bus_write_word(base_address, REGS(i));
+          bus_write_word(base_address, REGS(i) + ((i == 15) ? 0x4 : 0x0));
         //printf("%d\t(0x%08x) -> 0x%08x\n", i, REGS(i), base_address);
         base_address += 4;
       }
@@ -422,7 +423,8 @@ void arm_block_data_transfer(cpu_context *cpu)
         if (load)
           REGS(i) = bus_read_word(base_address);
         else
-          bus_write_word(base_address, REGS(i));
+          //bus_write_word(base_address, REGS(i));
+          bus_write_word(base_address, REGS(i) + ((i == 15) ? 0x4 : 0x0));
         //printf("%d\t(0x%08x) -> 0x%08x\n", i, REGS(i), base_address);
       }
     }
@@ -437,7 +439,8 @@ void arm_block_data_transfer(cpu_context *cpu)
         if (load)
           REGS(i) = bus_read_word(base_address);
         else
-          bus_write_word(base_address, REGS(i));
+          //bus_write_word(base_address, REGS(i));
+          bus_write_word(base_address, REGS(i) + ((i == 15) ? 0x4 : 0x0));
         //printf("%d\t(0x%08x) -> 0x%08x\n", i, REGS(i), base_address);
       }
     }
@@ -550,7 +553,6 @@ void arm_single_data_transfer(cpu_context *cpu)
   
   uint8_t rotation_in_word = offset % 4;
   offset -= rotation_in_word;
-  printf("OFFSET = 0x%08x\n", offset);
   if(pre_indexed)
   {
     if(up)
@@ -574,7 +576,6 @@ void arm_single_data_transfer(cpu_context *cpu)
       uint32_t temp = bus_read_word(address);
       REGS(Rd) = (temp >> (rotation_in_word * 8)) |
         (temp << (32 - (rotation_in_word * 8)));
-      
     }  
     else
     {
@@ -583,8 +584,6 @@ void arm_single_data_transfer(cpu_context *cpu)
     }
       
   }
-  printf("Current l/s address: 0x%08x\n", address);
-
   if(!pre_indexed)
   {
     if(up)
@@ -607,6 +606,25 @@ void arm_single_data_swap(cpu_context *cpu)
   uint8_t Rm = cpu->instruction_to_exec & 0xF;
   printf("swp%c\tr%d, r%d, [r%d]\n", byte ? 'b' : '\0',
     Rd, Rm, Rn);
+
+  // Implementation
+  uint32_t address = REGS(Rn);
+  uint8_t rotation_in_word = address % 4;
+  address -= rotation_in_word;
+
+  if(byte)
+  {
+    REGS(Rd) = bus_read(address);
+    bus_write(address, (uint8_t)REGS(Rm));
+  }
+  else
+  {
+    uint32_t temp = bus_read_word(address);
+    uint32_t value_to_store = REGS(Rm);
+    REGS(Rd) = (temp >> (rotation_in_word * 8)) |
+        (temp << (32 - (rotation_in_word * 8)));
+    bus_write_word(address, value_to_store);
+  }
 }
 
 void arm_multiply(cpu_context *cpu)
@@ -757,6 +775,7 @@ void arm_multiply_long(cpu_context *cpu)
 void arm_halfword_transfer(cpu_context *cpu)
 {
   // TO VERIFY!!!
+  printf("HERE\n");
   uint8_t cond = (cpu->instruction_to_exec >> 28) & 0xF;
   uint8_t pre_indexed = (cpu->instruction_to_exec >> 24) & 1;
   uint8_t up = (cpu->instruction_to_exec >> 23) & 1;
@@ -796,26 +815,30 @@ void arm_halfword_transfer(cpu_context *cpu)
 
   // Implementation
   uint32_t base_address = REGS(Rn);
+  uint32_t offset = REGS(Rm);
+  uint8_t rotation_in_word = offset % 2;
+  offset -= rotation_in_word;
   if (load)
   {
+    printf("LOAD\n");
     switch (sh)
     {
     case LTYPES_LDRH:
       if (pre_indexed)
       {
         if (up)
-          base_address += REGS(Rm);
+          base_address += offset;
         else
-          base_address -= REGS(Rm);
+          base_address -= offset;
         REGS(Rd) = 0x00000000 | bus_read_halfword(base_address);
       }
       else
       {
         REGS(Rd) = 0x00000000 | bus_read_halfword(base_address);
         if (up)
-          base_address += REGS(Rm);
+          base_address += offset;
         else
-          base_address -= REGS(Rm);
+          base_address -= offset;
       }
       break;
 
@@ -824,18 +847,18 @@ void arm_halfword_transfer(cpu_context *cpu)
       if (pre_indexed)
       {
         if (up)
-          base_address += REGS(Rm);
+          base_address += offset;
         else
-          base_address -= REGS(Rm);
+          base_address -= offset;
         value =  bus_read_halfword(base_address);
       }
       else
       {
         value =  bus_read_halfword(base_address);
         if (up)
-          base_address += REGS(Rm);
+          base_address += offset;
         else
-          base_address -= REGS(Rm);
+          base_address -= offset;
       }
       // sign extension
       uint32_t sign_extension = (value & 0x80) ? 0xFFFFFF00 : 0x00000000;
@@ -852,6 +875,7 @@ void arm_halfword_transfer(cpu_context *cpu)
         else
           base_address -= REGS(Rm);
         valueh =  bus_read_halfword(base_address);
+        valueh = valueh >> (rotation_in_word * 8);
       }
       else
       {
@@ -862,7 +886,9 @@ void arm_halfword_transfer(cpu_context *cpu)
           base_address -= REGS(Rm);
       }
       // sign extension
-      uint32_t sign_extensionh = (valueh & 0x8000) ? 0xFFFF0000 : 0x00000000;
+      uint32_t negative_mask = (rotation_in_word) ? 0xFFFFFF00 : 0xFFFF0000;
+      uint32_t sign_bit_mask = (rotation_in_word) ? 0x00000080 : 0x00008000;
+      uint32_t sign_extensionh = (valueh & sign_bit_mask) ? negative_mask : 0x00000000;
 
       REGS(Rd) = sign_extensionh | valueh;
       break;
@@ -875,11 +901,13 @@ void arm_halfword_transfer(cpu_context *cpu)
   }
   else
   {
+    printf("STORE\n");
     switch (sh)
     {
     case STYPES_STRH:
       if (pre_indexed)
       {
+        printf("PRE-INDEXED\n");
         if (up)
           base_address += REGS(Rm);
         else
@@ -888,6 +916,7 @@ void arm_halfword_transfer(cpu_context *cpu)
       }
       else
       {
+        printf("POST-INDEXED\n");
         bus_write_halfword(base_address, REGS(Rd));
         if (up)
           base_address += REGS(Rm);
@@ -913,7 +942,9 @@ void arm_halfword_transfer(cpu_context *cpu)
     }
   }
 
-  if (writeback)
+  //if (writeback)
+  //  REGS(Rn) = base_address;
+  if((writeback || !pre_indexed) && !(load && (Rn == Rd))) 
     REGS(Rn) = base_address;
 
 }
@@ -930,7 +961,7 @@ void arm_halfword_transfer_imm(cpu_context *cpu)
   uint8_t Rn = (cpu->instruction_to_exec >> 16) & 0xF;
   uint8_t Rd = (cpu->instruction_to_exec >> 12) & 0xF;
   
-  uint8_t offset = ((cpu->instruction_to_exec >> 4) & 0xF0) +
+  uint8_t ofs = ((cpu->instruction_to_exec >> 4) & 0xF0) +
     (cpu->instruction_to_exec & 0xF);
 
   const char *l_types[] =
@@ -954,7 +985,147 @@ void arm_halfword_transfer_imm(cpu_context *cpu)
     Rd, Rn);
 
   printf(pre_indexed ? ", %c#%d]%c\n" : "], %c#%d%c\n",
-    up ? '\0' : '-', offset, writeback ? '!' : '\0');
+    up ? '\0' : '-', ofs, writeback ? '!' : '\0');
+  
+  
+  // Implementation
+  uint32_t offset = (cpu->instruction_to_exec & 0x0000000F) |
+  ((cpu->instruction_to_exec >> 4) & 0x000000F0);
+  uint8_t rotation_in_word = offset % 2;
+  offset -= rotation_in_word;
+
+  uint32_t base_address = REGS(Rn);
+  if (load)
+  {
+    switch (sh)
+    {
+    case LTYPES_LDRH:
+      if (pre_indexed)
+      {
+        if (up)
+          base_address += offset;
+        else
+          base_address -= offset;
+        uint32_t temp = bus_read_halfword(base_address);
+        printf("temp = 0x%08x\n", temp);
+        temp = (temp >> (rotation_in_word * 8)) |
+          (temp << (32 - (rotation_in_word * 8)));
+        REGS(Rd) = temp;
+        printf("temp = 0x%08x\n", temp);
+      }
+      else
+      {
+        uint32_t temp = bus_read_halfword(base_address);
+        temp = (temp >> (rotation_in_word * 8)) |
+          (temp << (32 - (rotation_in_word * 8)));
+        REGS(Rd) = temp;
+        if (up)
+          base_address += offset;
+        else
+          base_address -= offset;
+      }
+      break;
+
+    case LTYPES_LDRSB:
+      uint8_t value;
+      if (pre_indexed)
+      {
+        if (up)
+          base_address += offset;
+        else
+          base_address -= offset;
+        value =  bus_read_halfword(base_address);
+      }
+      else
+      {
+        value =  bus_read_halfword(base_address);
+        if (up)
+          base_address += offset;
+        else
+          base_address -= offset;
+      }
+      // sign extension
+      uint32_t sign_extension = (value & 0x80) ? 0xFFFFFF00 : 0x00000000;
+
+      REGS(Rd) = sign_extension | value;
+      break;
+
+    case LTYPES_LDRSH:
+      uint32_t valueh;
+      if (pre_indexed)
+      {
+        if (up)
+          base_address += offset;
+        else
+          base_address -= offset;
+        valueh = bus_read_halfword(base_address);
+        valueh = valueh >> (rotation_in_word * 8);
+      }
+      else
+      {
+        valueh =  bus_read_halfword(base_address);
+        if (up)
+          base_address += offset;
+        else
+          base_address -= offset;
+      }
+      // sign extension
+      uint32_t negative_mask = (rotation_in_word) ? 0xFFFFFF00 : 0xFFFF0000;
+      uint32_t sign_bit_mask = (rotation_in_word) ? 0x00000080 : 0x00008000;
+      uint32_t sign_extensionh = (valueh & sign_bit_mask) ? negative_mask : 0x00000000;
+
+      REGS(Rd) = sign_extensionh | valueh;
+      break;
+
+    default:
+      fprintf(stderr, "Invalid load type");
+      exit(EXIT_FAILURE);
+      break;
+    }
+  }
+  else
+  {
+    switch (sh)
+    {
+    case STYPES_STRH:
+      if (pre_indexed)
+      {
+        if (up)
+          base_address += offset;
+        else
+          base_address -= offset;
+        bus_write_halfword(base_address, REGS(Rd));
+      }
+      else
+      {
+        bus_write_halfword(base_address, REGS(Rd));
+        if (up)
+          base_address += offset;
+        else
+          base_address -= offset;
+      }
+      break;
+
+    case STYPES_LDRD:
+      fprintf(stderr, "ldrd unsupported on this architecture!\n");
+      exit(EXIT_FAILURE);
+      break;
+
+    case STYPES_STRD:
+      fprintf(stderr, "strd unsupported on this architecture!\n");
+      exit(EXIT_FAILURE);
+      break;
+
+    default:
+      fprintf(stderr, "Invalid store type!\n");
+      exit(EXIT_FAILURE);
+      break;
+    }
+  }
+
+  if((writeback || !pre_indexed) && !(load && (Rn == Rd))) 
+    REGS(Rn) = base_address;
+
   
 }
 

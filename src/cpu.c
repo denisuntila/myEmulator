@@ -76,7 +76,10 @@ bool cpu_step()
 
 void cpu_print_failed_test()
 {
-  printf("Failed test = %d\n", *cpu.regs[12]);
+  if (*cpu.regs[12] == 0)
+    printf("All tests passed!\n");
+  else
+    printf("Failed test = %d\n", *cpu.regs[12]);
 }
 
 
@@ -197,6 +200,10 @@ bool cpu_thumb_step()
 
   PC += 2;
   printf("\n");
+
+  if (0x08001d4c == PC)
+    return false;
+  
   return true;
 }
 

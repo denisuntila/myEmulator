@@ -377,71 +377,240 @@ void arm_block_data_transfer(cpu_context *cpu)
       comma = comma | true;
     }
   }
-  printf("}\n");
+  printf("}%c\n", s_flag ? '^' : '\0');
 
   uint32_t base_address = REGS(Rn);
-  
+  uint32_t base_store_address = base_address;
+  bool first_flag;
+  bool base_reg_in_rlist = false;
+  bool base_reg_first_in_rlist = false;
+  int32_t increment = 0;
   switch (pu)
   {
   case AMOD_DA:
-    for (char i = 0xf; i >= 0; --i)
+    if((cpu->instruction_to_exec & 0xFFFF) == 0)
     {
-      if ((cpu->instruction_to_exec >> i) & 0x1)
+      if(load)
       {
-        if (load)
-          REGS(i) = bus_read_word(base_address);
-        else
-          bus_write_word(base_address, REGS(i) + ((i == 15) ? 0x4 : 0x0));
-        //printf("%d\t(0x%08x) -> 0x%08x\n", i, REGS(i), base_address);
-        base_address -= 4;
+        base_address -= 0x3C;
+        REGS(15) = bus_read_word(base_address);
+        base_address -= 0x04;
       }
+      else
+      {
+        base_address -= 0x3C;
+        bus_write_word(base_address, REGS(15) + 4);
+        base_address -= 0x04;
+      }
+    }
+    else
+    {
+      first_flag = false;
+      for (char i = 0xf; i >= 0; --i)
+      {
+        if ((cpu->instruction_to_exec >> i) & 0x1)
+        {
+          if(i == Rn)
+          {
+            base_reg_in_rlist = true;
+          }
+          if (load)
+          {
+            REGS(i) = bus_read_word(base_address);
+            if(base_reg_in_rlist)
+              writeback = 0;
+          }
+          else
+          {
+            if((i == Rn))
+            {
+              base_store_address = base_address;
+              first_flag = true;
+            }
+            else
+              first_flag = false;
+
+            bus_write_word(base_address, REGS(i) + ((i == 15) ? 0x4 : 0x0));
+          }
+
+          base_address -= 4;
+          increment -= 4;
+        }
+      }
+      base_reg_first_in_rlist = first_flag;
     }
     break;
 
   case AMOD_IA:
-    for (char i = 0; i < 0x10; ++i)
+    if((cpu->instruction_to_exec & 0xFFFF) == 0)
     {
-      if ((cpu->instruction_to_exec >> i) & 0x1)
+      if(load)
       {
-        if (load)
-          REGS(i) = bus_read_word(base_address);
-        else
-          //bus_write_word(base_address, REGS(i));
-          bus_write_word(base_address, REGS(i) + ((i == 15) ? 0x4 : 0x0));
-        //printf("%d\t(0x%08x) -> 0x%08x\n", i, REGS(i), base_address);
-        base_address += 4;
+        REGS(15) = bus_read_word(base_address);
+        base_address += 0x40;
+      }
+      else
+      {
+        bus_write_word(base_address, REGS(15) + 4);
+        base_address += 0x40;
+      }
+    }
+    else
+    {
+      first_flag = true;
+      for (char i = 0; i < 0x10; ++i)
+      {
+        if ((cpu->instruction_to_exec >> i) & 0x1)
+        {
+          if(i == Rn)
+          {
+            base_reg_in_rlist = true;
+          }
+          if (load)
+          {
+            if(base_reg_in_rlist)
+              writeback = 0;
+            if(s_flag)
+              cpu->regs_sys_usr[i] = bus_read_word(base_address);
+            else
+              REGS(i) = bus_read_word(base_address);
+          }
+          else
+          {
+            if (i == Rn)
+            {
+              base_store_address = base_address;
+            }
+            if(base_reg_in_rlist && first_flag)
+            {
+              base_reg_first_in_rlist = true;
+              base_store_address = base_address;
+              base_address -= 4;
+              increment -=4;
+            }   
+            bus_write_word(base_address, REGS(i) + ((i == 15) ? 0x4 : 0x0));
+          }
+          base_address += 4;
+          increment += 4;
+          first_flag = false;
+        }
       }
     }
     break;
 
   case AMOD_DB:
-    for (char i = 0xf; i >= 0; --i)
+    if((cpu->instruction_to_exec & 0xFFFF) == 0)
     {
-      if ((cpu->instruction_to_exec >> i) & 0x1)
+      if(load)
       {
-        base_address -= 4;
-        if (load)
-          REGS(i) = bus_read_word(base_address);
-        else
-          //bus_write_word(base_address, REGS(i));
-          bus_write_word(base_address, REGS(i) + ((i == 15) ? 0x4 : 0x0));
-        //printf("%d\t(0x%08x) -> 0x%08x\n", i, REGS(i), base_address);
+        base_address -= 0x40;
+        REGS(15) = bus_read_word(base_address);
       }
+      else
+      {
+        base_address -= 0x40;
+        bus_write_word(base_address, REGS(15) + 4);
+      }
+    }
+    else
+    {
+      first_flag = false;
+      for (char i = 0xf; i >= 0; --i)
+      {
+        if ((cpu->instruction_to_exec >> i) & 0x1)
+        {
+          if(i == Rn)
+          {
+            base_reg_in_rlist = true;
+          }
+        
+          base_address -= 4;
+          increment -= 4;
+
+          if (load)
+          {
+            if(base_reg_in_rlist)
+              writeback = 0;
+            if(s_flag)
+              cpu->regs_sys_usr[i] = bus_read_word(base_address);
+            else
+              REGS(i) = bus_read_word(base_address);
+          }
+          else
+          {
+            uint32_t val;
+            if (s_flag)
+              val = cpu->regs_sys_usr[i];
+            else
+              val = REGS(i);
+            if((i == Rn))
+            {
+              base_store_address = base_address;
+              first_flag = true;
+            }
+            else
+              first_flag = false;
+            bus_write_word(base_address, val + ((i == 15) ? 0x4 : 0x0));
+          }
+        }
+      }
+      base_reg_first_in_rlist = first_flag;
     }
     break;
 
   case AMOD_IB:
-    for (char i = 0; i < 0x10; ++i)
+    if((cpu->instruction_to_exec & 0xFFFF) == 0)
     {
-      if ((cpu->instruction_to_exec >> i) & 0x1)
+      if(load)
       {
-        base_address += 4;
-        if (load)
-          REGS(i) = bus_read_word(base_address);
-        else
-          //bus_write_word(base_address, REGS(i));
-          bus_write_word(base_address, REGS(i) + ((i == 15) ? 0x4 : 0x0));
-        //printf("%d\t(0x%08x) -> 0x%08x\n", i, REGS(i), base_address);
+        base_address += 0x04;
+        REGS(15) = bus_read_word(base_address);
+        base_address += 0x3C;
+      }
+      else
+      {
+        base_address += 0x04;
+        bus_write_word(base_address, REGS(15) + 4);
+        base_address += 0x3C;
+      }
+    }
+    else
+    {
+      first_flag = true;
+      for (char i = 0; i < 0x10; ++i)
+      {
+        if ((cpu->instruction_to_exec >> i) & 0x1)
+        {
+          if(i == Rn)
+          {
+            base_reg_in_rlist = true;
+          }
+
+          base_address += 4;
+          increment += 4;
+          if (load)
+          {
+            if(base_reg_in_rlist)
+              writeback = 0;
+            REGS(i) = bus_read_word(base_address);
+          }  
+          else
+          { 
+            if (i == Rn)
+            {
+              base_store_address = base_address;
+            }
+            if(base_reg_in_rlist && first_flag)
+            {
+              base_reg_first_in_rlist = true;
+              base_store_address = base_address;
+              base_address -= 4;
+              increment -=4;
+            } 
+            bus_write_word(base_address, REGS(i) + ((i == 15) ? 0x4 : 0x0));
+          }
+          first_flag = false;
+        }
       }
     }
     break;
@@ -449,6 +618,20 @@ void arm_block_data_transfer(cpu_context *cpu)
 
   if (writeback)
     REGS(Rn) = base_address;
+
+  //if (base_reg_in_rlist && ((int32_t)(base_address - base_store_address) != increment))
+  //  bus_write_word(base_store_address, base_address);
+  if (!load && base_reg_in_rlist)
+  {
+    if (base_reg_first_in_rlist)  // Store the old value
+    {
+      bus_write_word(base_store_address, base_address - increment);
+    }
+    else
+    {
+      bus_write_word(base_store_address, base_address);
+    }
+  }
 }
 
 
@@ -774,8 +957,6 @@ void arm_multiply_long(cpu_context *cpu)
 
 void arm_halfword_transfer(cpu_context *cpu)
 {
-  // TO VERIFY!!!
-  printf("HERE\n");
   uint8_t cond = (cpu->instruction_to_exec >> 28) & 0xF;
   uint8_t pre_indexed = (cpu->instruction_to_exec >> 24) & 1;
   uint8_t up = (cpu->instruction_to_exec >> 23) & 1;
@@ -808,9 +989,6 @@ void arm_halfword_transfer(cpu_context *cpu)
     Rd, Rn);
   printf(pre_indexed ? ", %cr%d]%c\n" : "], %c#%d%c\n",
     up ? '\0' : '-', Rm, writeback ? '!' : '\0');
-  //printf("%s%ch\tr%d, [r%d, %cr%d]%c\n", load ? "ldr" : "str", 
-  //  is_signed ? 's' : '\0', Rd, Rn, up ? '\0' : '-', Rm,
-  //  writeback ? '!' : '\0');
 
 
   // Implementation
@@ -820,7 +998,6 @@ void arm_halfword_transfer(cpu_context *cpu)
   offset -= rotation_in_word;
   if (load)
   {
-    printf("LOAD\n");
     switch (sh)
     {
     case LTYPES_LDRH:
@@ -901,13 +1078,11 @@ void arm_halfword_transfer(cpu_context *cpu)
   }
   else
   {
-    printf("STORE\n");
     switch (sh)
     {
     case STYPES_STRH:
       if (pre_indexed)
       {
-        printf("PRE-INDEXED\n");
         if (up)
           base_address += REGS(Rm);
         else
@@ -916,7 +1091,6 @@ void arm_halfword_transfer(cpu_context *cpu)
       }
       else
       {
-        printf("POST-INDEXED\n");
         bus_write_halfword(base_address, REGS(Rd));
         if (up)
           base_address += REGS(Rm);

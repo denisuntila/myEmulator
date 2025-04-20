@@ -43,7 +43,6 @@ int emu_run(int argc, char **argv)
   load_bios("../bios/gba_bios.bin");
   //load_cartridge("../roms/arm.gba");
   load_cartridge("../roms/thumb.gba");
-  
 
   
   while (ctx.running)
@@ -61,13 +60,14 @@ int emu_run(int argc, char **argv)
       return -3;
     }
 
-
     // 133
     // 636
-    if (ctx.ticks++ == 20)
+    // 560
+    if (ctx.ticks++ == 568)
       break;
     
   }
+
 
   dealloc_cartridge();
 

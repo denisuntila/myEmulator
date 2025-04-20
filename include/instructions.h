@@ -6,7 +6,7 @@
 
 
 void (*decode_instruction(uint32_t instruction))(cpu_context *);
-bool verify_condition(cpu_context *cpu);
+bool verify_condition(cpu_context *cpu, uint8_t cond);
 void flush(cpu_context *cpu);
 
 void (*thumb_decode_instruction(uint16_t instruction))(cpu_context *);

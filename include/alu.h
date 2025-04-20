@@ -68,6 +68,13 @@ void alu_bic(alu_args *args);
 void alu_mvn(alu_args *args);
 
 
+// For thumb instructions:
+void alu_lsl(alu_args *args);
+void alu_lsr(alu_args *args);
+void alu_asr(alu_args *args);
+void alu_ror(alu_args *args);
+void alu_neg(alu_args *args);
+void alu_mul(alu_args *args);
 
 
 static void (*alu_functions[])(alu_args *) =
@@ -97,6 +104,28 @@ static void (*thumb_alu_functions[])(alu_args *) =
   &alu_cmp,
   &alu_add,
   &alu_sub
+};
+
+
+
+static void (*thumb_alu_functions_complete[])(alu_args *) = 
+{
+  &alu_and,
+  &alu_eor,
+  &alu_lsl,
+  &alu_lsr,
+  &alu_asr,
+  &alu_adc,
+  &alu_sbc,
+  &alu_ror,
+  &alu_tst,
+  &alu_neg,
+  &alu_cmp,
+  &alu_cmn,
+  &alu_orr,
+  &alu_mul,
+  &alu_bic,
+  &alu_mvn
 };
 
 

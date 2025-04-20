@@ -270,23 +270,16 @@ void alu_cmn(alu_args *args)
 
 void alu_orr(alu_args *args)
 {
-  REGS(args->Rd) = REGS(args->Rn) | args->op2;
+  uint32_t result = REGS(args->Rn) | args->op2;
+  REGS(args->Rd) = result;
   if (!args->set_condition_codes)
     return;
 
-  //uint32_t cpsr = args->cpu->CPSR;
+  args->cpu->CPSR = (args->cpu->CPSR & 0x7FFFFFFF) |
+    (result & 0x80000000);
 
-  //cpsr &= 0x0FFFFFFF;
-  // N flag
-  //cpsr |= (REGS(args->Rd) & 0x80000000);
-  // Z flag
-  //cpsr |= ((REGS(args->Rd) == 0) ? 0x40000000 : 0x00000000);
-  // C flag (carry)
-  // not yet implemented
-  printf("SET CONDITION FLAG\n");
-  exit(-5);
-  
-  // V flag (overflow) (Not affected since is a logical operation)
+  args->cpu->CPSR = (args->cpu->CPSR & 0xBFFFFFFF) |
+    ((result == 0) << 30);
   
   
 }
@@ -317,26 +310,196 @@ void alu_bic(alu_args *args)
   if (!args->set_condition_codes)
     return;
 
-  printf("SET CONDITIONS\n");
+  
 }
 
 
 void alu_mvn(alu_args *args)
 {
-  REGS(args->Rd) = ~args->op2;
+  uint32_t result = ~args->op2;
+  REGS(args->Rd) = result;
 
   if (!args->set_condition_codes)
     return;
 
-  printf("SET CONDITIONS\n");
-  // Modify cpsr flags
-  //args->cpu->CPSR = (args->cpu->CPSR & 0x7FFFFFFF) |
-  //  (args->op2 & 0x80000000);
+  // Set condition flags
+  args->cpu->CPSR = (args->cpu->CPSR & 0x7FFFFFFF) |
+    (result & 0x80000000);
 
-  //args->cpu->CPSR = (args->cpu->CPSR & 0xBFFFFFFF) |
-  //  ((args->op2 == 0) << 30);
+  args->cpu->CPSR = (args->cpu->CPSR & 0xBFFFFFFF) |
+    ((result == 0) << 30);
   
 }
 
+    
 
+
+void alu_lsl(alu_args *args)
+{
+  uint32_t result; //= REGS(args->Rd) << args->op2;
+  uint32_t shift = args->op2;
+  
+  if (shift >= 32)
+  {
+    result = 0;
+    args->cpu->CPSR = (args->cpu->CPSR & 0xDFFFFFFF) |
+      (((REGS(args->Rd) & 0x1) && (shift == 32)) << 29);
+  }
+  else
+  {
+    result = REGS(args->Rd) << shift;
+    args->cpu->CPSR = (args->cpu->CPSR & 0xDFFFFFFF) |
+      ((REGS(args->Rd) << (shift - 1)) >> 2);
+  }
+
+  // Modify cpsr flags
+  args->cpu->CPSR = (args->cpu->CPSR & 0x7FFFFFFF) |
+    (result & 0x80000000);
+
+  args->cpu->CPSR = (args->cpu->CPSR & 0xBFFFFFFF) |
+    ((result == 0) << 30);
+
+
+  REGS(args->Rd) = result;
+
+}
+
+
+
+
+void alu_lsr(alu_args *args)
+{
+  uint32_t result; //= REGS(args->Rd) << args->op2;
+  uint32_t shift = args->op2;
+
+
+  if (shift > 32)
+  {
+    result = 0;
+    args->cpu->CPSR = (args->cpu->CPSR & 0xDFFFFFFF);
+    //args->cpu->CPSR = (args->cpu->CPSR & 0xDFFFFFFF) |
+    //  ((REGS(args->Rd) & 0x80000000) >> 2);
+  }
+  else if (shift == 32)
+  {
+    result = 0;
+    args->cpu->CPSR = (args->cpu->CPSR & 0xDFFFFFFF) |
+      ((REGS(args->Rd) & 0x80000000) >> 2);
+  }
+  else
+  {
+    result = REGS(args->Rd) >> shift;
+    args->cpu->CPSR = (args->cpu->CPSR & 0xDFFFFFFF) |
+      ((REGS(args->Rd) >> (shift - 1)) << 29); 
+  }
+
+  // Modify cpsr flags
+  args->cpu->CPSR = (args->cpu->CPSR & 0x7FFFFFFF) |
+    (result & 0x80000000);
+
+  args->cpu->CPSR = (args->cpu->CPSR & 0xBFFFFFFF) |
+    ((result == 0) << 30);
+
+
+  REGS(args->Rd) = result;
+}
+
+void alu_asr(alu_args *args)
+{
+  uint32_t result; //= REGS(args->Rd) << args->op2;
+  uint32_t shift = args->op2;
+
+  {
+    result = (int32_t)(REGS(args->Rd)) >> shift;
+    args->cpu->CPSR = (args->cpu->CPSR & 0xDFFFFFFF) |
+      (((int32_t)(REGS(args->Rd)) >> (shift - 1)) << 29);
+  }
+
+  // Modify cpsr flags
+  args->cpu->CPSR = (args->cpu->CPSR & 0x7FFFFFFF) |
+    (result & 0x80000000);
+
+  args->cpu->CPSR = (args->cpu->CPSR & 0xBFFFFFFF) |
+    ((result == 0) << 30);
+
+
+  REGS(args->Rd) = result;
+}
+
+void alu_ror(alu_args *args)
+{
+  uint32_t result; //= REGS(args->Rd) << args->op2;
+  uint32_t shift = args->op2;
+
+
+  if (shift == 32)
+  {
+    result = REGS(args->Rd);
+    args->cpu->CPSR = (args->cpu->CPSR & 0xDFFFFFFF) |
+      ((REGS(args->Rd) & 0x80000000) >> 2);
+  }
+  else if (shift == 0)
+  {
+    result = REGS(args->Rd);
+    args->cpu->CPSR = (args->cpu->CPSR & 0xDFFFFFFF) |
+      ((REGS(args->Rd) & 0x1) << 29);
+  }
+  else
+  {
+    result = (REGS(args->Rd) >> shift) | (REGS(args->Rd) << (32 - shift));
+    args->cpu->CPSR = (args->cpu->CPSR & 0xDFFFFFFF) |
+      ((result & 0x80000000) >> 2);
+  }
+
+  // Modify cpsr flags
+  args->cpu->CPSR = (args->cpu->CPSR & 0x7FFFFFFF) |
+    (result & 0x80000000);
+
+  args->cpu->CPSR = (args->cpu->CPSR & 0xBFFFFFFF) |
+    ((result == 0) << 30);
+
+
+  REGS(args->Rd) = result;
+}
+
+void alu_neg(alu_args *args)
+{
+  int32_t b = args->op2;
+  int32_t result = 0 - b;
+  REGS(args->Rd) = (uint32_t)result;
+    
+  if (!args->set_condition_codes)
+    return;
+  
+  // Modify cpsr flags
+  args->cpu->CPSR = (args->cpu->CPSR & 0x7FFFFFFF) |
+    (result & 0x80000000);
+
+  args->cpu->CPSR = (args->cpu->CPSR & 0xBFFFFFFF) |
+    ((result == 0) << 30);
+  
+  args->cpu->CPSR = (args->cpu->CPSR & 0xDFFFFFFF) |
+    (((0 >= b)) << 29);
+
+  args->cpu->CPSR = (args->cpu->CPSR & 0xEFFFFFFF) |
+    (((int32_t)((0 ^ b) & (result ^ 0)) < 0) << 28);
+  
+}
+
+void alu_mul(alu_args *args)
+{
+  uint32_t a = REGS(args->Rn);
+  //if (args->Rn == 15) a += 4;
+  uint32_t b = args->op2;
+  uint32_t result = a * b;
+
+  REGS(args->Rd) = result;
+
+  // Modify cpsr flags
+  args->cpu->CPSR = (args->cpu->CPSR & 0x7FFFFFFF) |
+    (result & 0x80000000);
+
+  args->cpu->CPSR = (args->cpu->CPSR & 0xBFFFFFFF) |
+    ((result == 0) << 30);
+}
 

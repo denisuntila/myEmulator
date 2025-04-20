@@ -269,9 +269,8 @@ void (*decode_instruction(uint32_t instruction))(cpu_context *)
   return &arm_no_impl;
 }
 
-bool verify_condition(cpu_context *cpu)
+bool verify_condition(cpu_context *cpu, uint8_t cond)
 {
-  uint8_t cond = cpu->instruction_to_exec >> 28;
   uint32_t state_register = cpu->CPSR;
   switch (cond)
   {
@@ -349,6 +348,7 @@ void arm_branch_and_exchange(cpu_context *cpu)
   REGS(15) = (REGS(Rn) & 0xFFFFFFFE);
   //cpu->CPSR |= 0x00000020;
   cpu->CPSR |= ((REGS(Rn) & 0x1) << 5);
+  thumb_flush(cpu);
 }
 
 
@@ -1618,15 +1618,32 @@ void thumb_software_interrupt(cpu_context *cpu)
 
 void thumb_unconditional_branch(cpu_context *cpu)
 {
-  printf("UNCOND\n");
-  NO_IMPL;
+  int16_t offset = (cpu->thumb_exec << 1) & 0xFFF;
+  offset |= (offset & 0x800) ? 0xF000 : 0x0000;
+
+  printf("b\t0x%08x\n", REGS(15) + 2 + offset);
+  REGS(15) = ((int32_t)REGS(15) + (int32_t)offset);
+  thumb_flush(cpu);
 }
 
 void thumb_conditional_branch(cpu_context *cpu)
 {
-  printf("COND\n");
-  NO_IMPL;
+  uint8_t cond = (cpu->thumb_exec >> 8) & 0xF;
+  int16_t offset = (cpu->thumb_exec << 1) & 0x1FF;
+  offset |= (offset >> 8) ? 0xFE00 : 0x0000;
+
+  printf("b%s\t0x%08x\n", conds[cond], REGS(15) + 2 + offset);
+
+  if (verify_condition(cpu, cond))
+  {
+    REGS(15) = ((int32_t)REGS(15) + (int32_t)offset);
+    thumb_flush(cpu);
+  }
+  else
+    printf("NOT EXECUTED DUE TO UNSATISFIED CONDITION!\n");
+  
 }
+
 
 void thumb_multiple_load_store(cpu_context *cpu)
 {
@@ -1636,14 +1653,37 @@ void thumb_multiple_load_store(cpu_context *cpu)
 
 void thumb_long_branch_and_link(cpu_context *cpu)
 {
-  printf("LBL\n");
-  NO_IMPL;
+  uint32_t offset = (cpu->thumb_exec) & 0x07FF;
+
+  if ((cpu->thumb_exec >> 11) & 0x1)
+  {
+    printf("Long bl: temp = ...; PC = LR + 0x%03x << 1;\n", offset);
+    // DEBUG HERE!!!
+    uint32_t temp = *cpu->regs[15];
+    *cpu->regs[15] = *cpu->regs[14] + (offset << 1);
+    *cpu->regs[14] = temp | 0x1;
+  }
+  else
+  {
+    printf("Long bl: LR = PC + 0x%03x << 12\n", offset);
+    *cpu->regs[14] = *cpu->regs[15] + 
+      (((offset >> 10) ? 0xFFC00000 : 0x0) | (offset << 12));   // HERE
+  }
 }
+
+// 0000 0000 0000 0000 0000 0100 0000 0000
+// 0000 0000 0000 0000 0000 0111 1111 1111
+// 0000 0000 0011 1111 1111 1111 1111 1111
+// 0000 0000 0010 0000 0000 0000 0000 0000
 
 void thumb_add_offset_to_sp(cpu_context *cpu)
 {
-  printf("AOSP\n");
-  NO_IMPL;
+  uint8_t is_negative = (cpu->thumb_exec >> 7) & 0x01;
+  uint16_t imm = (cpu->thumb_exec & 0x7F) << 2;
+
+  printf("add\tsp, %c0x%x\n", is_negative ? '-' : '\0', imm);
+
+  REGS(13) += (int32_t)(is_negative ? -1 : 1) * (int32_t) imm;
 }
 
 void thumb_push_pop_registers(cpu_context *cpu)
@@ -1669,7 +1709,7 @@ void thumb_load_address(cpu_context *cpu)
   uint8_t Rd = (cpu->thumb_exec >> 8) & 0x7;
   uint8_t sp = (cpu->thumb_exec >> 11) & 0x1;
   uint16_t offset = (cpu->thumb_exec << 2) & 0x03FC; 
-  printf("add\tR%d, %s, #0x%x\n", Rd, sp ? "sp" : "pc", offset);
+  printf("add\tr%d, %s, #0x%x\n", Rd, sp ? "sp" : "pc", offset);
 
   // Implementation
   void (*function)(alu_args *) = thumb_alu_functions[2];  // add
@@ -1678,8 +1718,13 @@ void thumb_load_address(cpu_context *cpu)
   args.Rd = Rd;
   args.Rn = sp ? 13 : 15;
   args.op2 = offset;
+  // consider the pipline
+  if (!sp && ((REGS(15) & 0x2) == 0))    // force bit 1 of the PC to 0
+    offset += 2;
+
   args.set_condition_codes = false; // Temporarly
   function(&args);
+
 }
 
 void thumb_load_store_imm_ofs(cpu_context *cpu)
@@ -1690,8 +1735,13 @@ void thumb_load_store_imm_ofs(cpu_context *cpu)
 
 void thumb_load_store_reg_ofs(cpu_context *cpu)
 {
-  printf("LSRO\n");
-  NO_IMPL;
+  uint8_t Rd = cpu->thumb_exec & 0x7;
+  uint8_t Rb = (cpu->thumb_exec >> 3) & 0x7;
+  uint8_t Ro = (cpu->thumb_exec >> 6) & 0x7;
+  uint8_t byte = (cpu->thumb_exec >> 10) & 0x1;
+  uint8_t load = (cpu->thumb_exec >> 11) & 0x1;
+
+  printf("%s%c\tr%d, [r%d, r%d]\n", load ? "ldr" : "str", byte ? 'b' : ' ', Rd, Rb, Ro);
 }
 
 void thumb_load_store_sign_ext_b_h(cpu_context *cpu)
@@ -1702,35 +1752,71 @@ void thumb_load_store_sign_ext_b_h(cpu_context *cpu)
 
 void thumb_pc_relative_load (cpu_context *cpu)
 {
-  printf("PRL\n");
-  NO_IMPL;
+  uint8_t Rd = (cpu->thumb_exec >> 8) & 0x7;
+  int16_t imm = (((cpu->thumb_exec & 0xFF) << 2) | (((cpu->thumb_exec >> 7) & 0x1) ? 0xFC00 : 0));
+  printf("ldr\tr%d, [pc, %d]\n", Rd, imm);
+
+  REGS(Rd) = bus_read_word((int32_t)REGS(15) + (int32_t)imm);
 }
 
 void thumb_hi_regs_ops_bx(cpu_context *cpu)
 {
   uint8_t opcode = (cpu->thumb_exec >> 8) & 0x3;
   uint8_t Rd = (cpu->thumb_exec & 0x7) | ((cpu->thumb_exec >> 4)) & 0x8;
-  uint8_t Rs = (cpu->thumb_exec >> 3) & 0x8;
+  uint8_t Rs = (cpu->thumb_exec >> 3) & 0xF;
 
   switch (opcode)
   {
   case 0x0:   // Add
     printf("add\tR%d, R%d\n", Rd, Rs);
+    uint32_t a = REGS(Rd);
+    uint32_t b = REGS(Rs);
+    b += (15 == Rs) ? 2 : 0;
+    uint32_t result = a + b;
+    REGS(Rd) = result;
+
     break;
   
   case 0x1:
     printf("cmp\tR%d, R%d\n", Rd, Rs);
+    a = REGS(Rd);
+    b = REGS(Rs);
+    printf("Computing 0x%08x - 0x%08x\n", a, b);
+
+    result = a - b;
+
+    // Set cpsr flags
+    cpu->CPSR = (cpu->CPSR & 0x7FFFFFFF) |
+      (result & 0x80000000);
+
+    cpu->CPSR = (cpu->CPSR & 0xBFFFFFFF) |
+      ((result == 0) << 30);
+
+    cpu->CPSR = (cpu->CPSR & 0xDFFFFFFF) |
+      (((a >= b)) << 29);
+
+    cpu->CPSR = (cpu->CPSR & 0xEFFFFFFF) |
+      (((int32_t)((a ^ b) & (result ^ a)) < 0) << 28);
     break;
   
   case 0x2:
     printf("mov\tR%d, R%d\n", Rd, Rs);
-    REGS(Rd) = REGS(Rs);
+    REGS(Rd) = REGS(Rs) + ((15 == Rs) ? 2 : 0);
+    
+    if ((15 == Rd))   // halfword alignment
+    {
+      REGS(15) &= 0xFFFFFFFE;
+    }
+
     break;
   
   case 0x3:
     printf("b%sx\tR%d\n", (Rd & 0x8) ? "l" : "" , Rs);
-    REGS(15) = (REGS(Rs)) - 2;
-    cpu->CPSR &= 0xFFFFFFDF;
+    REGS(15) = ((REGS(Rs)) & 0xFFFFFFFC) - 2; // -2
+    cpu->CPSR = (cpu->CPSR & 0xFFFFFFDF) | ((REGS(Rs) & 0x1) << 5); // MARK HERE
+    printf("FLUSHING THE PIPELINE\n");
+    flush(cpu);
+    thumb_flush(cpu);
     break;
   }
 
@@ -1738,7 +1824,34 @@ void thumb_hi_regs_ops_bx(cpu_context *cpu)
 
 void thumb_alu_operations(cpu_context *cpu)
 {
-  NO_IMPL;
+  const char *ops[] =
+  {
+    "and", "eor", "lsl", "lsr",
+    "asr", "adc", "sbc", "ror",
+    "tst", "neg", "cmp", "cmn",
+    "orr", "mul", "bic", "mvn"
+  };
+
+  uint8_t opcode = (cpu->thumb_exec >> 6) & 0xF;
+  uint8_t Rs = (cpu->thumb_exec >> 3) & 0x7;
+  uint8_t Rd = cpu->thumb_exec & 0x7;
+
+  printf("%s ...\n", ops[opcode]);
+
+  void (*function)(alu_args *) = thumb_alu_functions_complete[opcode];
+  uint32_t op2;
+  alu_args args;
+
+  args.Rd = Rd;
+  args.Rn = Rd;
+  args.op2 = *cpu->regs[Rs];
+  args.set_condition_codes = true;
+  args.cpu = cpu;
+
+  function(&args);
+
+  if ((15 == Rd))   // halfword alignment
+    REGS(15) &= 0xFFFFFFFE;
 }
 
 void thumb_mov_cmp_add_sub_imm(cpu_context *cpu)
@@ -1760,25 +1873,121 @@ void thumb_mov_cmp_add_sub_imm(cpu_context *cpu)
   alu_args args;
   args.cpu = cpu;
   args.Rd = Rd;
+  args.Rn = Rd;
   args.op2 = nn;
-  args.set_condition_codes = false; // Temporarly
+  args.set_condition_codes = true; // Temporarly
   function(&args);
 }
 
 void thumb_add_sub(cpu_context *cpu)
 {
-  NO_IMPL;
+  uint8_t Rd = cpu->thumb_exec & 0x7;
+  uint8_t Rs = (cpu->thumb_exec >> 0x3) & 0x7;
+  uint8_t Rn = (cpu->thumb_exec >> 0x6) & 0x7;
+  
+  printf("%s\tR%d, R%d, %c%d\n", (cpu->thumb_exec & 0x200) ? 
+    "sub" : "add", Rd, Rs, (cpu->thumb_exec & 0x400) ? 
+    '#' : 'R', Rn);
+  
+  // Implementation
+  alu_args args;
+  args.cpu = cpu;
+  args.set_condition_codes = true;
+  args.Rd = Rd;
+  args.Rn = Rs;
+
+  if (cpu->thumb_exec & 0x400)
+    args.op2 = Rn;
+  else
+    args.op2 = REGS(Rn);
+
+  if (cpu->thumb_exec & 0x200)
+    alu_sub(&args);
+  else
+    alu_add(&args);
 }
 
 void thumb_mov_shifted_regs(cpu_context *cpu)
 {
-  NO_IMPL;
+  uint8_t opcode = (cpu->thumb_exec >> 11) & 0x3;
+  uint8_t Rd = cpu->thumb_exec & 0x7;
+  uint8_t Rn = (cpu->thumb_exec >> 3) & 0x7;
+  uint8_t shift = (cpu->thumb_exec >> 6) & 0x1F;
+
+  const char *s_types[] =
+  {
+    "lsl", "lsr", "asr", "INVALID"
+  };
+
+  printf("%s\tR%d, R%d, #%d\n", s_types[opcode], Rd, Rn, shift);
+
+  uint32_t op2;
+  uint32_t val = REGS(Rn);
+  switch (opcode)
+  {
+  case LSL: // lsl
+    op2 = val << shift;
+
+    if (shift != 0)
+      cpu->CPSR = (cpu->CPSR & 0xDFFFFFFF) |
+        ((val << (shift - 1)) >> 2);
+    break;
+  
+  case LSR: // lsr
+
+    if (shift != 0)
+    {
+      op2 = val >> shift;
+      cpu->CPSR = (cpu->CPSR & 0xDFFFFFFF) |
+        ((val >> (shift - 1)) << 29);
+    }
+    else
+    {
+      op2 = 0;
+      cpu->CPSR = (cpu->CPSR & 0xDFFFFFFF) |
+        ((val & 0x80000000) >> 2);
+    }
+    break;
+  
+
+  case ASR: // asr
+
+    if (shift != 0)
+    {
+      op2 = (int32_t)(val) >> shift;
+      cpu->CPSR = (cpu->CPSR & 0xDFFFFFFF) |
+        (((int32_t)(val) >> (shift - 1)) << 29); 
+    }
+    else
+    {
+      op2 = (val & 0x80000000) ? 0xFFFFFFFF : 0x0;
+      cpu->CPSR = (cpu->CPSR & 0xDFFFFFFF) |
+        ((val & 0x80000000) >> 2);
+    }
+    break;
+  
+    
+  default:
+    fprintf(stderr, "Invalid opcode in mov shifted regs instruction!\n");
+    exit(EXIT_FAILURE);
+  }
+
+  REGS(Rd) = op2;
+
+  cpu->CPSR = (cpu->CPSR & 0x7FFFFFFF) |
+    (op2 & 0x80000000);
+
+  cpu->CPSR = (cpu->CPSR & 0xBFFFFFFF) |
+    ((op2 == 0) << 30);
+
+  
+  if ((15 == Rd))   // halfword alignment
+    REGS(15) &= 0xFFFFFFFE;
 }
 
 
 void thumb_flush(cpu_context *cpu)
 {
-  //printf("Flushing the pipeline!\n");
   cpu->thumb_decode   = THUMB_NOP;
   cpu->thumb_fetch    = THUMB_NOP;
 }

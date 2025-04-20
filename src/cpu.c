@@ -76,10 +76,13 @@ bool cpu_step()
 
 void cpu_print_failed_test()
 {
-  if (*cpu.regs[12] == 0)
+  // Choose the register
+  uint8_t reg = ((cpu.CPSR >> 5) & 0x1) ? 7 : 12;
+
+  if (*cpu.regs[reg] == 0)
     printf("All tests passed!\n");
   else
-    printf("Failed test = %d\n", *cpu.regs[12]);
+    printf("Failed test = %d\n", *cpu.regs[reg]);
 }
 
 
@@ -93,7 +96,8 @@ bool cpu_arm_step_old()
   printf("Decoded instruction = 0x%08x\n", cpu.decoded_instruction);
 
   uint32_t old_pc = PC;
-  if (verify_condition(&cpu))
+  uint8_t cond = cpu.instruction_to_exec >> 28;
+  if (verify_condition(&cpu, cond))
     cpu.function(&cpu);
   else
     printf("NOT EXECUTED DUE TO UNSATISFIED CONDITION\n");
@@ -131,23 +135,24 @@ bool cpu_arm_step_old()
 bool cpu_arm_step()
 {
   printf("CPSR = 0x%08x\n", cpu.CPSR);
-  //if(cpu.current_SPSR != NULL)
-  //  printf("SPSR = 0x%08x\n", *cpu.current_SPSR);
-  //else
-  //  printf("No SPSR in current mode!\n");
   cpu.fetched_instruction = bus_read_word(PC);
   printf("Fetched instruction: 0x%08x\n", cpu.fetched_instruction);
   printf("Executing instruction: 0x%08x\n", cpu.instruction_to_exec);
 
   uint32_t old_pc = PC;
-  if (verify_condition(&cpu))
+  uint8_t cond = cpu.instruction_to_exec >> 28;
+  if (verify_condition(&cpu, cond))
     cpu.function(&cpu);
   else
     printf("NOT EXECUTED DUE TO UNSATISFIED CONDITION\n");
   
   // If an instruction changed the pc, then flush the pipeline
   if (old_pc != PC)
+  {
+    printf("ziopera %d\n", PC % 4);
     flush(&cpu);
+  }
+    
 
   cpu.function = decode_instruction(cpu.fetched_instruction);
   cpu.instruction_to_exec = cpu.fetched_instruction;
@@ -177,23 +182,29 @@ bool cpu_thumb_step()
 {
   cpu.thumb_fetch = bus_read_halfword(PC);
   printf("Fetched THUMB instruction: 0x%04x\n", cpu.thumb_fetch);
-  printf("Decoded THUMB instruction: 0x%04x\n", cpu.thumb_decode);
+  //printf("Decoded THUMB instruction: 0x%04x\n", cpu.thumb_decode);
 
   uint32_t old_pc = PC;
   cpu.thumb_function(&cpu);
   printf("Executed THUMB instruction: 0x%04x\n", cpu.thumb_exec);
 
   if (old_pc != PC)
+  {
+    if (PC % 2)
+      PC -= 1;
     thumb_flush(&cpu);
+  }
 
   
-  cpu.thumb_function = thumb_decode_instruction(cpu.thumb_decode);
-  cpu.thumb_exec = cpu.thumb_decode;
-  cpu.thumb_decode = cpu.thumb_fetch;
+  cpu.thumb_function = thumb_decode_instruction(cpu.thumb_fetch);
+  //cpu.thumb_exec = cpu.thumb_decode;
+  //cpu.thumb_decode = cpu.thumb_fetch;
+  cpu.thumb_exec = cpu.thumb_fetch;
 
   printf("R0 = 0x%08x\n", REGS(0));
   printf("R1 = 0x%08x\n", REGS(1));
-  printf("R12 = 0x%08x\n", REGS(12));
+  printf("R8 = 0x%08x\n", REGS(8));
+  printf("R9 = 0x%08x\n", REGS(9));
   printf("LR = 0x%08x\n", LR);
   printf("SP = 0x%08x\n", SP);
   printf("nzcv = 0b%04b\n", cpu.CPSR >> 28);
@@ -201,9 +212,9 @@ bool cpu_thumb_step()
   PC += 2;
   printf("\n");
 
-  if (0x08001d4c == PC)
+  if (0x08000930 == PC)
     return false;
-  
+
   return true;
 }
 

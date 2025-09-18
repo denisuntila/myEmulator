@@ -203,6 +203,7 @@ bool cpu_thumb_step()
 
   printf("R0 = 0x%08x\n", REGS(0));
   printf("R1 = 0x%08x\n", REGS(1));
+  printf("R2 = 0x%08x\n", REGS(2));
   printf("R8 = 0x%08x\n", REGS(8));
   printf("R9 = 0x%08x\n", REGS(9));
   printf("LR = 0x%08x\n", LR);

@@ -1,1 +1,0 @@
-/usr/bin/cc  -O3 CMakeFiles/main.dir/src/main.c.o CMakeFiles/main.dir/src/emulator.c.o CMakeFiles/main.dir/src/cpu.c.o CMakeFiles/main.dir/src/cartridge.c.o CMakeFiles/main.dir/src/bus.c.o CMakeFiles/main.dir/src/instructions.c.o CMakeFiles/main.dir/src/bios.c.o CMakeFiles/main.dir/src/alu.c.o -o main  /usr/lib/libSDL2main.a /usr/lib/libSDL2-2.0.so.0.3200.54 -lSDL2_ttf

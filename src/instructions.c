@@ -1742,6 +1742,27 @@ void thumb_load_store_reg_ofs(cpu_context *cpu)
   uint8_t load = (cpu->thumb_exec >> 11) & 0x1;
 
   printf("%s%c\tr%d, [r%d, r%d]\n", load ? "ldr" : "str", byte ? 'b' : ' ', Rd, Rb, Ro);
+  printf("ZIOPERA\n");
+
+  uint32_t address = REGS(Rb) + REGS(Ro);
+  printf("*Rb = 0x%08x\n*Ro = 0x%08x\n", REGS(Rb), REGS(Ro));
+  printf("Address = 0x%08x\n", address);
+
+  if (byte)
+  {
+    if(load)
+      REGS(Rd) = (uint32_t)((int32_t)bus_read(address));
+    else
+      bus_write(address, (uint8_t)REGS(Rd));
+  }
+  else
+  {
+    if(load)
+      REGS(Rd) = (uint32_t)((int32_t)bus_read_word(address));
+    else
+      bus_write_word(address, (uint32_t)REGS(Rd));
+  }
+
 }
 
 void thumb_load_store_sign_ext_b_h(cpu_context *cpu)

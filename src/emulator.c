@@ -63,8 +63,8 @@ int emu_run(int argc, char **argv)
     // 133
     // 636
     // 560
-    if (ctx.ticks++ == 568)
-      break;
+    //if (ctx.ticks++ == 568)
+    //  break;
     
   }
 

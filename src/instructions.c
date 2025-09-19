@@ -1742,23 +1742,36 @@ void thumb_load_store_reg_ofs(cpu_context *cpu)
   uint8_t load = (cpu->thumb_exec >> 11) & 0x1;
 
   printf("%s%c\tr%d, [r%d, r%d]\n", load ? "ldr" : "str", byte ? 'b' : ' ', Rd, Rb, Ro);
-  printf("ZIOPERA\n");
 
-  uint32_t address = REGS(Rb) + REGS(Ro);
-  printf("*Rb = 0x%08x\n*Ro = 0x%08x\n", REGS(Rb), REGS(Ro));
-  printf("Address = 0x%08x\n", address);
+  uint32_t address = (REGS(Rb) + REGS(Ro)); 
+  //address -= (address & 0x1) << 2;                       // halfword alignement (?)
+  uint8_t flag = (uint8_t)address & 0x1;
+  address &= 0xFFFFFFFE;
+  uint32_t temp;
 
   if (byte)
   {
     if(load)
-      REGS(Rd) = (uint32_t)((int32_t)bus_read(address));
+    {
+      temp = (uint32_t)((int32_t)bus_read(address));
+      if (flag)
+        REGS(Rd) = ((temp >> 8) | (temp << 24));
+      else
+        REGS(Rd) = temp;
+    }
     else
       bus_write(address, (uint8_t)REGS(Rd));
   }
   else
   {
     if(load)
-      REGS(Rd) = (uint32_t)((int32_t)bus_read_word(address));
+    {
+      temp = (uint32_t)((int32_t)bus_read_word(address));
+      if (flag)
+        REGS(Rd) = ((temp >> 8) | (temp << 24));
+      else
+        REGS(Rd) = temp;
+    }
     else
       bus_write_word(address, (uint32_t)REGS(Rd));
   }
@@ -1767,8 +1780,58 @@ void thumb_load_store_reg_ofs(cpu_context *cpu)
 
 void thumb_load_store_sign_ext_b_h(cpu_context *cpu)
 {
-  printf("LSSEBH\n");
-  NO_IMPL;
+  uint8_t Rd = cpu->thumb_exec & 0x7;
+  uint8_t Rb = (cpu->thumb_exec  >> 3) & 0x7;
+  uint8_t Ro = (cpu->thumb_exec  >> 6) & 0x7;
+  uint8_t opcode = (cpu->thumb_exec >> 10) & 0x3;
+
+  uint32_t address = REGS(Rb) + REGS(Ro);
+
+  uint8_t flag = (uint8_t)address & 0x1;
+  address &= 0xFFFFFFFE;
+
+  uint32_t temp;
+
+  switch (opcode)
+  {
+    case 0:
+      printf("strh");
+      bus_write_halfword(address, (uint16_t)REGS(Rd));
+      break;
+    
+    case 1:
+      printf("ldsb");
+      temp = (uint32_t)bus_read(address);
+      REGS(Rd) = (temp | ((temp >> 7) ? 0xFFFFFF00 : 0x00000000));
+      break;
+    
+    case 2:
+      printf("ldrh");
+      temp = (uint32_t)bus_read_halfword(address);
+      if (flag)
+        REGS(Rd) = ((temp >> 8) | (temp << 24));
+      else
+        REGS(Rd) = temp;
+      break;
+
+    case 3:
+      printf("ldsh");
+      temp = (uint32_t)bus_read_halfword(address);
+      if (flag)
+      {   // TO CHECK
+        temp = ((temp >> 8) | (temp << 24));
+        REGS(Rd) = (temp | ((temp >> 7) ? 0xFFFFFF00 : 0x00000000));
+        //REGS(Rd) = ((temp >> 8) | (temp << 24));
+      }
+      else
+      {
+        REGS(Rd) = (temp | ((temp >> 15) ? 0xFFFF0000 : 0x00000000));
+      }
+
+      break;
+  }
+
+  printf("\tr%d, [r%d, r%d]\n", Rd, Rb, Ro);
 }
 
 void thumb_pc_relative_load (cpu_context *cpu)

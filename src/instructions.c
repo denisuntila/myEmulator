@@ -1694,14 +1694,55 @@ void thumb_push_pop_registers(cpu_context *cpu)
 
 void thumb_load_store_halfword(cpu_context *cpu)
 {
-  printf("LSH\n");
-  NO_IMPL;
+  uint8_t Rd = (cpu->thumb_exec) & 0x7;
+  uint8_t Rb = (cpu->thumb_exec >> 3) & 0x7;
+  uint32_t nn = (cpu->thumb_exec >> 5) & 0x3E;
+  uint8_t load = (cpu->thumb_exec >> 11) & 0x1;
+
+  uint32_t address = REGS(Rb) + nn;
+
+  if (load)
+  {
+    printf("ldrh");
+    uint32_t temp = (uint32_t)bus_read_halfword(address & 0xFFFFFFFE);
+    if (address & 0x1)
+      REGS(Rd) = ((temp >> 8) | (temp << 24));
+    else
+      REGS(Rd) = temp;
+
+  }
+  else
+  {
+    printf("strh");
+    bus_write_halfword(address & 0xFFFFFFFE, (uint16_t)REGS(Rd));
+  }
+
+  printf("\tr%d, [r%d, #0x%02x]\n", Rd, Rb, nn);
 }
 
 void thumb_sp_relative_load_store(cpu_context *cpu)
 {
   printf("SPLS\n");
-  NO_IMPL;
+  uint32_t nn = ((uint8_t)cpu->thumb_exec) << 0x2;
+  uint8_t Rd = (cpu->thumb_exec >> 8) & 0x7;
+  uint8_t load = (cpu->thumb_exec >> 11) & 0x1;
+
+  uint32_t address = REGS(13) + nn;
+
+  if (load)
+  {
+    printf("ldr");
+    uint32_t temp = bus_read_word(address & 0xFFFFFFFC);
+    uint8_t ror = (address & 0x3) * 8;
+    REGS(Rd) = ((temp >> ror) | (temp << (32 - ror)));
+  }
+  else
+  {
+    printf("str");
+    bus_write_word(address & 0xFFFFFFFC, REGS(Rd));
+  }
+
+  printf("\tr%d, [sp, #0x%03x]\n", Rd, nn);
 }
 
 void thumb_load_address(cpu_context *cpu)
@@ -1729,8 +1770,46 @@ void thumb_load_address(cpu_context *cpu)
 
 void thumb_load_store_imm_ofs(cpu_context *cpu)
 {
-  printf("LSIO\n");
-  NO_IMPL;
+  uint8_t Rd = (cpu->thumb_exec) & 0x7;
+  uint8_t Rb = (cpu->thumb_exec >> 3) & 0x7;
+  uint32_t nn = (cpu->thumb_exec >> 6) & 0x1F;
+  uint8_t opcode = (cpu->thumb_exec >> 11) & 0x3;
+
+  if (!(opcode >> 1))
+    nn = nn << 2;
+  
+  uint32_t address = REGS(Rb) + nn;
+  //uint8_t flag = address & 0x1;
+  //address &= 0xFFFFFFFE;
+
+  switch (opcode)
+  {
+    case 0:
+      printf("str");
+      bus_write_word(address & 0xFFFFFFFE, REGS(Rd));
+      break;
+
+    case 1:
+      printf("ldr");
+      uint32_t temp = bus_read_word(address & 0xFFFFFFFE);
+      if (address & 0x1)
+        REGS(Rd) = ((temp >> 8) | (temp << 24));
+      else
+        REGS(Rd) = temp;
+      break;
+
+    case 2:
+      printf("strb");
+      bus_write(address, (uint8_t)REGS(Rd));
+      break;
+
+    case 3:
+      printf("ldrb");
+      REGS(Rd) = (uint32_t)bus_read(address);
+      break;
+  }
+
+  printf("\tr%d, [r%d, #0x%02x]\n", Rd, Rb, nn);
 }
 
 void thumb_load_store_reg_ofs(cpu_context *cpu)

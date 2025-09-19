@@ -149,7 +149,6 @@ bool cpu_arm_step()
   // If an instruction changed the pc, then flush the pipeline
   if (old_pc != PC)
   {
-    printf("ziopera %d\n", PC % 4);
     flush(&cpu);
   }
     
@@ -204,8 +203,9 @@ bool cpu_thumb_step()
   printf("R0 = 0x%08x\n", REGS(0));
   printf("R1 = 0x%08x\n", REGS(1));
   printf("R2 = 0x%08x\n", REGS(2));
-  printf("R8 = 0x%08x\n", REGS(8));
-  printf("R9 = 0x%08x\n", REGS(9));
+  printf("R3 = 0x%08x\n", REGS(3));
+  printf("R4 = 0x%08x\n", REGS(4));
+  printf("R5 = 0x%08x\n", REGS(5));
   printf("LR = 0x%08x\n", LR);
   printf("SP = 0x%08x\n", SP);
   printf("nzcv = 0b%04b\n", cpu.CPSR >> 28);

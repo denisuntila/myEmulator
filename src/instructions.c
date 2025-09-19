@@ -1645,10 +1645,90 @@ void thumb_conditional_branch(cpu_context *cpu)
 }
 
 
+// Writeback with Rb included in Rlist: Store OLD base if Rb is FIRST 
+// entry in Rlist, otherwise store NEW base (STM/ARMv4), always store 
+// OLD base (STM/ARMv5), no writeback (LDM/ARMv4/ARMv5; at this point, 
+// THUMB opcodes work different than ARM opcodes).
+
+
+// 76543210
+// 11100000
+// 
+
 void thumb_multiple_load_store(cpu_context *cpu)
 {
   printf("MLS\n");
-  NO_IMPL;
+  uint8_t rlist = (uint8_t)cpu->thumb_exec;
+  uint8_t Rb = (cpu->thumb_exec >> 8) & 0x7;
+  uint8_t load = (cpu->thumb_exec >> 10) & 0x2;
+
+  uint8_t load_valid_rlist = load | (rlist != 0);
+
+  uint8_t base_in_rlist = (rlist >> Rb) & 0x1;
+  uint8_t base_first_in_rlist = (rlist & (0xFF >> (8 - Rb))) == 0;    // is zero also if rlist is 0
+
+
+  switch (load_valid_rlist)
+  {
+    case 0b11:
+      printf("ldmia");
+      for (uint8_t i = 0; i < 8; ++i)
+      {
+        if ((rlist >> i) & 0x1)
+        {
+          REGS(i) = bus_read_word(REGS(Rb));
+          REGS(Rb) += 4;
+        }
+      }
+      break;
+    
+    case 0b01:
+      printf("stmia");
+      uint32_t base = REGS(Rb);
+      uint32_t real_address;
+      for (uint8_t i = 0; i < 8; ++i)
+      {
+        if ((rlist >> i) & 0x1)
+        {
+          if (i == Rb)
+            real_address = base;
+          bus_write_word(base, REGS(i));
+          base += 4;
+        }
+      }
+      REGS(Rb) = base;
+      if (base_in_rlist && base_first_in_rlist)
+      {
+        bus_write_word(real_address, real_address);
+      }
+      if (base_in_rlist && !base_first_in_rlist)
+        bus_write_word(real_address, REGS(Rb));
+      break;
+
+    case 0b10:
+      printf("Load invalid rlist\n");
+      printf("ldm");
+      REGS(15) = bus_read_word(REGS(Rb));
+      REGS(Rb) += 0x40;
+      break;
+    
+    case 0b00:
+      printf("Store invalid rlist\n");
+      printf("stm");
+      bus_write_word(REGS(Rb), REGS(15) + 4);     // due to the pipeline
+      REGS(Rb) += 0x40;
+      break;
+      
+  }
+
+  printf("\tr%d!, {", Rb);
+  for (uint8_t i = 0; i < 8; ++i)
+  {
+    if ((rlist >> i) & 0x1)
+      printf("r%d ", i);
+  }
+
+  printf("}\n");
 }
 
 void thumb_long_branch_and_link(cpu_context *cpu)
@@ -1688,8 +1768,58 @@ void thumb_add_offset_to_sp(cpu_context *cpu)
 
 void thumb_push_pop_registers(cpu_context *cpu)
 {
-  printf("PPR\n");
-  NO_IMPL;
+  uint8_t rlist = (uint8_t)cpu->thumb_exec;
+  uint8_t pc_lr = (cpu->thumb_exec >> 8) & 0x1;
+  uint8_t pop = (cpu->thumb_exec >> 11) & 0x1;
+
+  if (pop)
+  {
+    printf("pop");
+
+    if (pc_lr)
+    {
+      REGS(15) = bus_read_word(REGS(13));
+      REGS(13) +=4;
+    }
+
+    for (int8_t i = 7; i >= 0; --i)
+    {
+      if ((rlist >> i) & 0x1)
+      {
+        REGS(i) = bus_read_word(REGS(13));
+        REGS(13) += 4;
+      }
+    }
+
+  }
+  else
+  {
+    printf("push");
+    for (uint8_t i = 0; i < 8; ++i)
+    {
+      if ((rlist >> i) & 0x1)
+      {
+        REGS(13) -= 4;
+        bus_write_word(REGS(13), REGS(i));
+      }
+    }
+    if (pc_lr)
+    {
+      REGS(13) -=4;
+      bus_write_word(REGS(13), REGS(14));
+    }
+  }
+
+  printf("\t{");
+  for (uint8_t i = 0; i < 8; ++i)
+  {
+    if ((rlist >> i) & 0x1)
+      printf("r%d ", i);
+  }
+
+  if (pc_lr)
+    printf((pop) ? "pc " : "lr ");
+  printf("}\n");
 }
 
 void thumb_load_store_halfword(cpu_context *cpu)
@@ -1722,7 +1852,6 @@ void thumb_load_store_halfword(cpu_context *cpu)
 
 void thumb_sp_relative_load_store(cpu_context *cpu)
 {
-  printf("SPLS\n");
   uint32_t nn = ((uint8_t)cpu->thumb_exec) << 0x2;
   uint8_t Rd = (cpu->thumb_exec >> 8) & 0x7;
   uint8_t load = (cpu->thumb_exec >> 11) & 0x1;
@@ -1786,16 +1915,14 @@ void thumb_load_store_imm_ofs(cpu_context *cpu)
   {
     case 0:
       printf("str");
-      bus_write_word(address & 0xFFFFFFFE, REGS(Rd));
+      bus_write_word(address & 0xFFFFFFFC, REGS(Rd));
       break;
 
     case 1:
       printf("ldr");
-      uint32_t temp = bus_read_word(address & 0xFFFFFFFE);
-      if (address & 0x1)
-        REGS(Rd) = ((temp >> 8) | (temp << 24));
-      else
-        REGS(Rd) = temp;
+      uint32_t temp = bus_read_word(address & 0xFFFFFFFC);
+      uint8_t ror = (address & 0x3) * 8;
+      REGS(Rd) = ((temp >> ror) | (temp << (32 - ror)));
       break;
 
     case 2:

@@ -344,8 +344,8 @@ void arm_branch_and_exchange(cpu_context *cpu)
 {
   uint8_t Rn = cpu->instruction_to_exec & 0x0F;
   printf("bx \tr%d\n", Rn);
-  //REGS(15) = (REGS(Rn) & 0xFFFFFFFE) - 4;
-  REGS(15) = (REGS(Rn) & 0xFFFFFFFE);
+  REGS(15) = (REGS(Rn) & 0xFFFFFFFE) - 4;
+  //REGS(15) = (REGS(Rn) & 0xFFFFFFFE);
   //cpu->CPSR |= 0x00000020;
   cpu->CPSR |= ((REGS(Rn) & 0x1) << 5);
   thumb_flush(cpu);
@@ -393,7 +393,7 @@ void arm_block_data_transfer(cpu_context *cpu)
       if(load)
       {
         base_address -= 0x3C;
-        REGS(15) = bus_read_word(base_address);
+        REGS(15) = bus_read_word(base_address) - 4;
         base_address -= 0x04;
       }
       else
@@ -416,7 +416,7 @@ void arm_block_data_transfer(cpu_context *cpu)
           }
           if (load)
           {
-            REGS(i) = bus_read_word(base_address);
+            REGS(i) = bus_read_word(base_address) - ((i == 15) ? 0x4 : 0x0);
             if(base_reg_in_rlist)
               writeback = 0;
           }
@@ -446,7 +446,7 @@ void arm_block_data_transfer(cpu_context *cpu)
     {
       if(load)
       {
-        REGS(15) = bus_read_word(base_address);
+        REGS(15) = bus_read_word(base_address) - 4;
         base_address += 0x40;
       }
       else
@@ -471,9 +471,13 @@ void arm_block_data_transfer(cpu_context *cpu)
             if(base_reg_in_rlist)
               writeback = 0;
             if(s_flag)
-              cpu->regs_sys_usr[i] = bus_read_word(base_address);
+            {
+              cpu->regs_sys_usr[i] = bus_read_word(base_address) - ((i == 15) ? 0x4 : 0x0);
+            }
             else
-              REGS(i) = bus_read_word(base_address);
+            {
+              REGS(i) = bus_read_word(base_address) - ((i == 15) ? 0x4 : 0x0);
+            }
           }
           else
           {
@@ -504,7 +508,7 @@ void arm_block_data_transfer(cpu_context *cpu)
       if(load)
       {
         base_address -= 0x40;
-        REGS(15) = bus_read_word(base_address);
+        REGS(15) = bus_read_word(base_address) - 4;
       }
       else
       {
@@ -532,9 +536,9 @@ void arm_block_data_transfer(cpu_context *cpu)
             if(base_reg_in_rlist)
               writeback = 0;
             if(s_flag)
-              cpu->regs_sys_usr[i] = bus_read_word(base_address);
+              cpu->regs_sys_usr[i] = bus_read_word(base_address) - ((i == 15) ? 0x4 : 0x0);
             else
-              REGS(i) = bus_read_word(base_address);
+              REGS(i) = bus_read_word(base_address) - ((i == 15) ? 0x4 : 0x0);
           }
           else
           {
@@ -564,7 +568,7 @@ void arm_block_data_transfer(cpu_context *cpu)
       if(load)
       {
         base_address += 0x04;
-        REGS(15) = bus_read_word(base_address);
+        REGS(15) = bus_read_word(base_address) - 4;
         base_address += 0x3C;
       }
       else
@@ -592,7 +596,7 @@ void arm_block_data_transfer(cpu_context *cpu)
           {
             if(base_reg_in_rlist)
               writeback = 0;
-            REGS(i) = bus_read_word(base_address);
+            REGS(i) = bus_read_word(base_address) - ((i == 15) ? 0x4 : 0x0);
           }  
           else
           { 
@@ -649,7 +653,7 @@ void arm_branch_branch_link(cpu_context *cpu)
   //cpu->fetched_instruction = NOP;
   //printf("---> %x + %x - 0x4\n", REGS(15), offset);
   //REGS(15) += offset - 4;
-  REGS(15) += offset;
+  REGS(15) += offset - 4;
 
   flush(cpu);
 }
@@ -757,12 +761,15 @@ void arm_single_data_transfer(cpu_context *cpu)
     if(load)
     {
       uint32_t temp = bus_read_word(address);
-      REGS(Rd) = (temp >> (rotation_in_word * 8)) |
+      uint32_t value = (temp >> (rotation_in_word * 8)) |
         (temp << (32 - (rotation_in_word * 8)));
+      if (Rd == 15) value -= 4;
+      REGS(Rd) = value;
     }  
     else
     {
       uint32_t value = REGS(Rd) + ((Rd == 15) ? 4 : 0);
+      //uint32_t value = REGS(Rd);
       bus_write_word(address, value);
     }
       
@@ -1468,7 +1475,7 @@ void arm_data_processing(cpu_context *cpu)
     uint8_t Rm = cpu->instruction_to_exec & 0xF;
     uint32_t val = REGS(Rm);
 
-    //if (Rm == 15) printf("HEREE\n");
+    //if (Rm == 15) val += 4;
     // only 2 reads can be done simultaneously!
     if ((Rm == 15) && shift_by_register) val += 4;
     if ((((cpu->instruction_to_exec >> 16) & 0xF) == 15) && shift_by_register) val += 4;
@@ -1589,6 +1596,7 @@ void arm_data_processing(cpu_context *cpu)
 void flush(cpu_context *cpu)
 {
   //printf("Flushing the pipeline!\n");
+  cpu->instruction_to_exec = NOP;
   cpu->decoded_instruction = NOP;
   cpu->fetched_instruction = NOP;
 }
@@ -1621,8 +1629,8 @@ void thumb_unconditional_branch(cpu_context *cpu)
   int16_t offset = (cpu->thumb_exec << 1) & 0xFFF;
   offset |= (offset & 0x800) ? 0xF000 : 0x0000;
 
-  printf("b\t0x%08x\n", REGS(15) + 2 + offset);
-  REGS(15) = ((int32_t)REGS(15) + (int32_t)offset);
+  printf("b\t0x%08x\n", REGS(15) + offset);
+  REGS(15) = ((int32_t)REGS(15) - 2 + (int32_t)offset);
   thumb_flush(cpu);
 }
 
@@ -1880,17 +1888,16 @@ void thumb_load_address(cpu_context *cpu)
   uint8_t sp = (cpu->thumb_exec >> 11) & 0x1;
   uint16_t offset = (cpu->thumb_exec << 2) & 0x03FC; 
   printf("add\tr%d, %s, #0x%x\n", Rd, sp ? "sp" : "pc", offset);
-
   // Implementation
   void (*function)(alu_args *) = thumb_alu_functions[2];  // add
   alu_args args;
+  // consider the pipline
+  //if (!sp && ((REGS(15) & 0x2) == 0))    // force bit 1 of the PC to 0
+  //  offset -= 2;
   args.cpu = cpu;
   args.Rd = Rd;
   args.Rn = sp ? 13 : 15;
   args.op2 = offset;
-  // consider the pipline
-  if (!sp && ((REGS(15) & 0x2) == 0))    // force bit 1 of the PC to 0
-    offset += 2;
 
   args.set_condition_codes = false; // Temporarly
   function(&args);

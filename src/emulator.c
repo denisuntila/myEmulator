@@ -40,10 +40,9 @@ int emu_run(int argc, char **argv)
   ctx.paused = false;
   ctx.ticks = 0;
 
-  //load_bios("../bios/gba_bios.bin");
+  load_bios("../bios/gba_bios.bin");
   //load_cartridge("../roms/arm.gba");
   //load_cartridge("../roms/thumb.gba");
-  //load_cartridge("../roms/nes.gba");
   load_cartridge("../roms/memory.gba");
 
   
@@ -65,7 +64,8 @@ int emu_run(int argc, char **argv)
     // 133
     // 636
     // 560
-    if (ctx.ticks++ == 124)
+    // 124
+    if (ctx.ticks++ == 146)
       break;
     
   }

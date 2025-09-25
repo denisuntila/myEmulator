@@ -76,6 +76,10 @@ void alu_ror(alu_args *args);
 void alu_neg(alu_args *args);
 void alu_mul(alu_args *args);
 
+// I didn't find a more elegant way to do it
+// without rewriting all the instructions :))
+void alu_add_thumb(alu_args *args);
+
 
 static void (*alu_functions[])(alu_args *) =
 {
@@ -102,7 +106,7 @@ static void (*thumb_alu_functions[])(alu_args *) =
 {
   &alu_mov,
   &alu_cmp,
-  &alu_add,
+  &alu_add_thumb,
   &alu_sub
 };
 

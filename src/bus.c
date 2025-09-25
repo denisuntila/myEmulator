@@ -350,6 +350,11 @@ uint32_t bus_read_word(uint32_t address)
     address &= 0x000003FF;
     return read_oam_word(address);
   }
+  else
+  {
+    printf("Unused address!\n");
+    return 0;
+  }
 
   NO_IMPL
 }

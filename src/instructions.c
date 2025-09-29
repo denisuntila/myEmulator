@@ -751,6 +751,9 @@ void arm_single_data_transfer(cpu_context *cpu)
 
   if(byte)
   {
+    uint8_t check_address = (address >> 24) & 0xF;
+    if (check_address >= 0x5 && check_address <= 0xC)   // video memory
+      return;
     if(load)
       REGS(Rd) = (uint32_t)((int32_t)bus_read(address));
     else
@@ -1414,7 +1417,7 @@ void arm_data_processing(cpu_context *cpu)
     uint8_t Is = (cpu->instruction_to_exec >> 7) & 0x1E;  //multiplied by 2
     // ror shift
     uint32_t value = (nn >> Is) | (nn << (32 - Is));
-    printf("#0x%x\n", value);
+    printf("#0x%08x\n", value);
   }
   else
   {

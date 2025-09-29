@@ -419,6 +419,7 @@ void bus_write_word(uint32_t address, uint32_t value)
   {
     address &= 0x000003FF;
     write_oam_word(address, value);
+    printf("DEBUG\n");
     return;
   }
   

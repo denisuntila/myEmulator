@@ -36,7 +36,7 @@ cmake ..
 make
 ./main
 ```
-
+In order to run the tests, you must modify the file loaded in src/emulator.c
 
 ---
 

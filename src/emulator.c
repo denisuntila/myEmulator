@@ -83,7 +83,7 @@ int emu_run(int argc, char **argv)
   ctx.paused = false;
   ctx.ticks = 0;
 
-  load_bios("../bios/gba_bios.bin");
+  //load_bios("../bios/gba_bios.bin");
   load_cartridge("../roms/arm.gba");
   //load_cartridge("../roms/thumb.gba");
   //load_cartridge("../roms/memory.gba");

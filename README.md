@@ -21,12 +21,12 @@ It is not meant to compete with existing GBA emulators, but rather to serve as a
 
 # Build & Dependencies
 
-This project is written in **C** and uses **SDL2** for rendering (WIP).
+This project is written in **C** and uses **SDL3** for rendering (WIP).
 
 ## Requirements
 - C compiler (tested with GCC/Clang)
 - [CMake](https://cmake.org/)
-- [SDL2](https://www.libsdl.org/) development libraries
+- [SDL3](https://www.libsdl.org/) development libraries
 
 ## Compilation & Run
 ```bash

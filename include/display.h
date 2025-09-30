@@ -2,9 +2,7 @@
 #define HH_DISPLAY_HH
 
 #include <stdint.h>
-#include <pthread.h>
-#include <SDL2/SDL.h>
-#include <SDL2/SDL_ttf.h>
+#include <SDL3/SDL.h>
 
 #define GBA_WIDTH   240
 #define GBA_HEIGHT  160
@@ -12,19 +10,24 @@
 
 typedef struct Display
 {
-  SDL_Window* window;
-  SDL_Renderer* renderer;
-  SDL_Texture* texture;
-  uint16_t framebuffer[GBA_WIDTH * GBA_HEIGHT]; // pixel buffer
-  pthread_mutex_t fb_mutex;
-  pthread_cond_t fb_cond;
-  int frame_ready;
-  int running;
-  pthread_barrier_t barrier;
+  SDL_Thread *thread;
+  SDL_Window *window;
+  SDL_Mutex *mutex;
+  uint8_t running;
+  uint8_t refresh;
+
+  // Just for now, before I implement frame buffer
+  struct
+  {
+    uint8_t red;
+    uint8_t green;
+    uint8_t blue;
+  } color;
+  
 } Display;
 
 void display_init(Display *display, char *title, uint8_t scale);
-void display_update(Display *display);
+void display_update(Display *display, int i);
 void display_destroy(Display *display);
 
 

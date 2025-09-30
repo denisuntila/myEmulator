@@ -1,8 +1,7 @@
 #include <stdio.h>
 #include <stdbool.h>
 
-#include <SDL2/SDL.h>
-#include <pthread.h>
+#include <SDL3/SDL.h>
 
 #include "emulator.h"
 #include "cartridge.h"
@@ -24,60 +23,10 @@ emu_context *emu_get_context()
   return &ctx;
 }
 
-pthread_barrier_t barrier;
-bool running = true;
-bool update = false;
-pthread_mutex_t mtx = PTHREAD_MUTEX_INITIALIZER;
-pthread_cond_t cv = PTHREAD_COND_INITIALIZER;
-
-void *test(void *arg)
-{
-  SDL_Init(0);
-  SDL_Window* w = SDL_CreateWindow
-  (
-    "Test Finestra",
-    SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-    640, 480,
-    SDL_WINDOW_SHOWN
-  );
-
-  SDL_Renderer* r = SDL_CreateRenderer(w, -1, 0);
-
-  SDL_SetRenderDrawColor(r, 0, 0, 0, 255);
-  SDL_RenderClear(r);
-  SDL_RenderPresent(r);
-
-  pthread_barrier_wait(&barrier);
-
-  while (running)
-  {
-    SDL_Delay(20);
-    SDL_Event e;
-    while (SDL_PollEvent(&e)) {
-      if (e.type == SDL_QUIT) {
-        running = false;
-        pthread_cond_signal(&cv);
-      }
-    }
-
-  }
-
-  SDL_DestroyRenderer(r);
-  SDL_DestroyWindow(w);
-  SDL_Quit();
-}
-
 
 int emu_run(int argc, char **argv)
 {
-  //display_init(&display, "GBA Emulator", 3);
-  //display_update(&display);
-  pthread_t sdl_thread;
-  pthread_barrier_init(&barrier, NULL, 2);
-  pthread_create(&sdl_thread, NULL, test, NULL);
-
   cpu_init();
-  pthread_barrier_wait(&barrier);
 
   ctx.running = true;
   ctx.paused = false;
@@ -96,7 +45,6 @@ int emu_run(int argc, char **argv)
     {
       printf("CPU stopped!\n");
       cpu_print_failed_test();
-      pthread_join(sdl_thread, NULL);
       return -3;
     }
 
@@ -104,15 +52,24 @@ int emu_run(int argc, char **argv)
     // 636
     // 560
     // 124
-    //if (ctx.ticks++ == 1000)
-    //  break;
+    if (ctx.ticks++ == 1)
+      break;
     
   }
 
+  display_init(&display, "Prova", 3);
+  for (int i = 0; i < 5; ++i)
+  {
+    display_update(&display, i);
+    SDL_Delay(1000);
+  }
+
+  SDL_Delay(2000);
+  display_destroy(&display);
+  
+  SDL_WaitThread(display.thread, NULL);
 
   dealloc_cartridge();
-  pthread_join(sdl_thread, NULL);
-  pthread_barrier_destroy(&barrier);
 
   return 0;
 }

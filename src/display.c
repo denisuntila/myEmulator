@@ -3,48 +3,90 @@
 
 #include "display.h"
 
+int window_thread(void *data) {
+    Display *display = (Display *)data;
+    display->window = SDL_CreateWindow(
+      "SDL3 Finestra con Renderer",
+      800,
+      600,
+      0
+    );
+    if (!display->window) {
+      printf("Errore SDL_CreateWindow: %s\n", SDL_GetError());
+      return -1;
+    }
+
+    SDL_Renderer *renderer = SDL_CreateRenderer(display->window, NULL);
+    if (!renderer) {
+      printf("Errore SDL_CreateRenderer: %s\n", SDL_GetError());
+      SDL_DestroyWindow(display->window);
+      return -1;
+    }
+
+    SDL_SetRenderDrawColor(renderer, display->color.red, display->color.green, display->color.blue, 255);
+    SDL_RenderClear(renderer);
+    SDL_RenderPresent(renderer);
+
+    // Ciclo eventi/rendering
+    while (display->running) {
+      SDL_Event event;
+      while (SDL_PollEvent(&event)) {
+        if (event.type == SDL_EVENT_QUIT) {
+          display->running = 0;
+        }
+      }
+
+      SDL_LockMutex(display->mutex);
+      if (display->refresh)
+      {
+        SDL_SetRenderDrawColor(renderer, display->color.red, display->color.green, display->color.blue, 255);
+        SDL_RenderClear(renderer);
+        SDL_RenderPresent(renderer);
+        display->refresh = 0;
+      }
+      SDL_UnlockMutex(display->mutex);
+
+
+      SDL_Delay(16); // ~60 fps
+    }
+
+    SDL_DestroyRenderer(renderer);
+    SDL_DestroyWindow(display->window);
+    return 0;
+}
+
 void display_init(Display *display, char *title, uint8_t scale)
 {
-  printf("Display initialization\n");
-  if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS) < 0) {
-    printf("Errore SDL_Init: %s\n", SDL_GetError());
-    return;
-  }
+  SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS);
 
-  display->window = SDL_CreateWindow
-  (
-    title,
-    SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-    GBA_WIDTH*scale, GBA_HEIGHT*scale,
-    SDL_WINDOW_SHOWN
-  );
-  display->renderer = SDL_CreateRenderer(display->window, -1, 
-    SDL_RENDERER_ACCELERATED);
-  display->texture = SDL_CreateTexture
-  (
-    display->renderer,
-    SDL_PIXELFORMAT_RGB565,
-    SDL_TEXTUREACCESS_STREAMING,
-    GBA_WIDTH, GBA_HEIGHT
-  );
-
-  pthread_mutex_init(&display->fb_mutex, NULL);
-  pthread_cond_init(&display->fb_cond, NULL);
-  display->frame_ready = 0;
+  display->mutex = SDL_CreateMutex();
   display->running = 1;
+  display->refresh = 0;
+  display->thread = SDL_CreateThread(window_thread, "WindowThread", display);
+
+}
+
+void display_update(Display *display, int i)
+{
+  uint8_t colors[][3] = 
+  {
+    {255, 0, 0},
+    {0, 255, 0},
+    {0, 0, 255},
+    {255, 0, 255},
+    {255, 255, 255}
+  };
+
+  SDL_LockMutex(display->mutex);
+  display->color.red = colors[i][0];
+  display->color.green = colors[i][1];
+  display->color.blue = colors[i][2];
+  display->refresh = 1;
+  SDL_UnlockMutex(display->mutex);
 }
 
 
-
-void display_update(Display* display) {
-  pthread_mutex_lock(&display->fb_mutex);
-  if (display->frame_ready) {
-    SDL_UpdateTexture(display->texture, NULL, display->framebuffer, 
-      GBA_WIDTH * sizeof(uint16_t));
-    SDL_RenderClear(display->renderer);
-    SDL_RenderCopy(display->renderer, display->texture, NULL, NULL);
-    SDL_RenderPresent(display->renderer);
-    display->frame_ready = 0;
-  }
-  pthread_mutex_unlock(&display->fb_mutex);
+void display_destroy(Display *display)
+{
+  display->running = 0;
 }
